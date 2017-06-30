@@ -1,5 +1,4 @@
 clear variables;
-%new edit hallo
 
 %--------- GLOBAL CONSTANTS----------------
 global MU_0 GAMMA EARTH_RADIUS EARTH_MASS;
@@ -28,16 +27,6 @@ veloSAT = [0, V0, 0];
 B = mFluxDesity(posSAT, dipoleEarth);
 F_G = gravityEarth(posSAT, 1)
 F_m = magneticForce(posSAT, dipoleCube, dipoleEarth)
-
-
-%Florian 20:47
-%Flo 20:52
-%Flo 21:05
-
-%Flo 20:59
-%browser edit
-
-% Hallo
 
 
 function F_G = gravityEarth(r, m)
