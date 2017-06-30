@@ -35,8 +35,6 @@ F_m = magneticForce(posSAT, dipoleCube, dipoleEarth)
 %Flo 20:59
 %browser edit
 
-% max hallo
-% 21:36
 
 function F_G = gravityEarth(r, m)
 %   r: from earth's center to location
