@@ -1,6 +1,6 @@
 clear variables;
 %florians branch
-
+% for real 
 %--------- GLOBAL CONSTANTS----------------
 global MU_0 GAMMA EARTH_RADIUS EARTH_MASS;
 EARTH_RADIUS = 6371000;
