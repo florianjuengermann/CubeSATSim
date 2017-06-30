@@ -1,6 +1,7 @@
 clear variables;
 %new edit hallo
 %endlich wieder am STart!!!
+%neuer branch
 
 %--------- GLOBAL CONSTANTS----------------
 global MU_0 GAMMA EARTH_RADIUS EARTH_MASS;
