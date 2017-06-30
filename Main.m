@@ -6,6 +6,7 @@ EARTH_MASS = 5.972e24;
 GAMMA = 6.674e-11;
 MU_0 = pi*4e-7;
 
+% $x^2+e^{\pi i}$
 %-------- CUBESAT PARAMETERS--------------
 global HEIGHT J CUBE_MASS;
 HEIGHT = 400000;
@@ -27,7 +28,7 @@ F_G = gravityEarth(posSAT, 1)
 F_m = magneticForce(posSAT, dipoleCube, dipoleEarth)
 
 
-
+%Florian 20:47
 
 
 
