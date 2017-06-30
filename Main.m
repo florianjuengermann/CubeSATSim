@@ -26,7 +26,7 @@ posSAT = [EARTH_RADIUS+HEIGHT,0,0];
 veloSAT = [0, V0, 0];
 
 angularVel = [0, 0, 0];
-dirSAT = [0, 0, 0]
+dirSAT = [0, 0, 0];
 
 B = mFluxDesity(posSAT, dipoleEarth);
 F_G = gravityEarth(posSAT, 1)
@@ -40,7 +40,7 @@ while 1
     % TODO Calculate dipoleCube based on time-varying input
     F_m = magneticForce(posSAT, dipoleCube, dipoleEarth)
     
-    accSAT = (F_G + F_M) / CUBE_MASS
+    accSAT = (F_G + F_m) / CUBE_MASS
     
     veloSAT = veloSAT + accSAT * T
     posSAT = posSAT + veloSAT * T
@@ -51,9 +51,9 @@ while 1
     B = mFluxDesity(posSAT, dipoleEarth)
     tSAT = magneticTorque(B, dipoleCube)
     
-    angularAcc = J \ b; %inv(J) * tSAT
+    angularAcc = J \ tSAT; %inv(J) * tSAT
     angularVel = angularVel + angularAcc * T
-    dirSAT = dirSAT 
+    dirSAT = rotateVec(angularVel / norm(angularVel), dirSAT, norm(angularVel)) 
     
 end
 
@@ -90,6 +90,9 @@ function t = magneticTorque(B, m)
     t = cross(m, B);
 end
 
-function 
-
-
+function vRot = rotateVec(k, v, theta)
+%   k: rotation axis (unit vector)
+%   v: vector to be rotated around k
+%   theta: rotation angle (in radians)
+    vRot = v * cos(theta) + cross(k,v) * sin(theta) + k * dot(k,v) * (1 - cos(theta))
+end
