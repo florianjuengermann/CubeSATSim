@@ -1,5 +1,4 @@
 clear variables;
-%Florian 20:34
 %--------- GLOBAL CONSTANTS----------------
 global MU_0 GAMMA EARTH_RADIUS EARTH_MASS;
 EARTH_RADIUS = 6371000;
