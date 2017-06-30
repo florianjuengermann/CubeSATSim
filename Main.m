@@ -1,8 +1,4 @@
 clear variables;
-<<<<<<< HEAD
-=======
-%florians branch
->>>>>>> 1900c4c4cd7d72f5119bd73e1dd4e8f00ae7dee5
 
 %--------- GLOBAL CONSTANTS----------------
 global MU_0 GAMMA EARTH_RADIUS EARTH_MASS T;
