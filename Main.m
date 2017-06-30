@@ -1,3 +1,5 @@
+%test
+
 clear variables;
 %--------- GLOBAL CONSTANTS----------------
 global MU_0 GAMMA EARTH_RADIUS EARTH_MASS;
