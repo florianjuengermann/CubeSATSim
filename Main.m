@@ -1,14 +1,12 @@
 clear variables;
-%florians branch
-% for real 
-% lolol
 
 %--------- GLOBAL CONSTANTS----------------
-global MU_0 GAMMA EARTH_RADIUS EARTH_MASS;
+global MU_0 GAMMA EARTH_RADIUS EARTH_MASS T;
 EARTH_RADIUS = 6371000;
 EARTH_MASS = 5.972e24;
 GAMMA = 6.674e-11;
 MU_0 = pi*4e-7;
+T = 1;
 
 % $x^2+e^{\pi i}$
 %-------- CUBESAT PARAMETERS--------------
@@ -19,7 +17,7 @@ CUBE_MASS = 1;
 
 
 
-V0 = sqrt(GAMMA * EARTH_MASS / EARTH_RADIUS);
+V0 = sqrt(GAMMA * EARTH_MASS / EARTH_RADIUS)
 
 dipoleEarth = [0,0, 1e23];
 dipoleCube = [1,0, 0]; %TODO test only
@@ -27,20 +25,37 @@ dipoleCube = [1,0, 0]; %TODO test only
 posSAT = [EARTH_RADIUS+HEIGHT,0,0]; 
 veloSAT = [0, V0, 0];
 
+angularVel = [0, 0, 0];
+dirSAT = [0, 0, 0]
+
 B = mFluxDesity(posSAT, dipoleEarth);
 F_G = gravityEarth(posSAT, 1)
 F_m = magneticForce(posSAT, dipoleCube, dipoleEarth)
 
 
-%Florian 20:47
-%Flo 20:52
-%Flo 21:05
-
-%Flo 20:59
-%browser edit
-
-% Hallo
-
+while 1
+    
+    %------- CUBESAT POSITION -------
+    F_G = gravityEarth(posSAT, 1)
+    % TODO Calculate dipoleCube based on time-varying input
+    F_m = magneticForce(posSAT, dipoleCube, dipoleEarth)
+    
+    accSAT = (F_G + F_M) / CUBE_MASS
+    
+    veloSAT = veloSAT + accSAT * T
+    posSAT = posSAT + veloSAT * T
+    
+    
+    
+    %------- CUBESAT ATTITUDE -------
+    B = mFluxDesity(posSAT, dipoleEarth)
+    tSAT = magneticTorque(B, dipoleCube)
+    
+    angularAcc = J \ b; %inv(J) * tSAT
+    angularVel = angularVel + angularAcc * T
+    dirSAT = dirSAT 
+    
+end
 
 function F_G = gravityEarth(r, m)
 %   r: from earth's center to location
@@ -74,5 +89,7 @@ function t = magneticTorque(B, m)
 %   m: magnetic dipole moment
     t = cross(m, B);
 end
+
+function 
 
 
