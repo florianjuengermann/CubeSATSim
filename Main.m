@@ -30,8 +30,13 @@ F_m = magneticForce(posSAT, dipoleCube, dipoleEarth)
 
 %Florian 20:47
 %Flo 20:52
+<<<<<<< HEAD
 %Flo 21:05
 
+=======
+%Flo 20:59
+%browser edit
+>>>>>>> 67569608d625c924ee62a06d5b4995c6580a2e06
 
 
 
