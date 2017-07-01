@@ -6,7 +6,7 @@ EARTH_RADIUS = 6371000;
 EARTH_MASS = 5.972e24;
 GAMMA = 6.674e-11;
 MU_0 = pi*4e-7;
-T = 1;
+T = 0.001;
 
 % $x^2+e^{\pi i}$
 %-------- CUBESAT PARAMETERS--------------
@@ -26,7 +26,7 @@ posSAT = [EARTH_RADIUS+HEIGHT; 0; 0];
 veloSAT = [0; V0; 0];
 
 angularVel = [0; 0; 0];
-dirSAT = [0; 0; 0];
+dirSAT = [1; 0; 0];
 
 B = mFluxDesity(posSAT, dipoleEarth);
 F_G = gravityEarth(posSAT, 1)
@@ -36,8 +36,8 @@ F_m = magneticForce(posSAT, dipoleCube, dipoleEarth)
 
 figure
 hold on
-toPlot = [];
-x=1:1:10000;
+toPlot = zeros(1,5000);
+x=1:1:5000;
 
 for i = x
     
@@ -55,13 +55,13 @@ for i = x
     
     %------- CUBESAT ATTITUDE -------
     B = mFluxDesity(posSAT, dipoleEarth);
-    tSAT = magneticTorque(B, dipoleCube)
+    tSAT = magneticTorque(B, dipoleCube);
     
     angularAcc =  J \ tSAT; % inv(J) * tSAT;
     angularVel = angularVel + angularAcc * T;
     dirSAT = rotateVec(angularVel / norm(angularVel), dirSAT, norm(angularVel));
-
-    toPlot = [toPlot dirSAT(2,1)*1e4];
+    
+    toPlot(1,i) = dirSAT(1)*1e4;
 end
 
 plot(x, toPlot)
