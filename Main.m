@@ -6,9 +6,16 @@ EARTH_RADIUS = 6371000;
 EARTH_MASS = 5.972e24;
 GAMMA = 6.674e-11;
 MU_0 = pi*4e-7;
+%{
+%zoomed in 
 T = 0.05;
-STEPS = 50;
-SIM_FACTOR = 700;
+STEPS = 20;
+SIM_FACTOR = 100;
+%}
+%zoomed out (whole circle) 
+T = 0.1;
+STEPS = 100;
+SIM_FACTOR = 500;
 DIPOLE_EARTH = [0; 0; 1e23];
 
 % $x^2+e^{\pi i}$
@@ -26,8 +33,8 @@ MU = 1;
 V0 = sqrt(GAMMA * EARTH_MASS / EARTH_RADIUS);
 
 
-I_1 = 1;
-I_2 = 1;
+I_1 = 0;
+I_2 = 0;
 I_3 = 1;
 
 posSAT = [EARTH_RADIUS+HEIGHT; 0; 0]; 
@@ -71,7 +78,7 @@ for i = x
     
     %------- CUBESAT ATTITUDE -------
     B = mFluxDesity(posSAT, DIPOLE_EARTH);
-    tSAT = magneticTorqueSAT(posSAT, dirSAT, dirNormalSAT, I_1, I_2, I_3)   % TODO Change I_x over time
+    tSAT = magneticTorqueSAT(posSAT, dirSAT, dirNormalSAT, I_1, I_2, I_3);   % TODO Change I_x over time
     
     angularAcc =  J \ tSAT; % inv(J) * tSAT;
     angularVel = angularVel + angularAcc * T;
