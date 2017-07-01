@@ -38,8 +38,10 @@ I_2 = 0;%dir: dirNorm
 I_3 = 0;%dir: cross(dirSat,dirNorm)
 
 posSAT = [EARTH_RADIUS+HEIGHT; 0; 0]; 
-inclAngle = 0.3;
+inclAngle = 0.0;
 veloSAT = [0; cos(inclAngle)*V0; sin(inclAngle)*V0];
+
+angularVel = [0; 0; 0.01];
 
 angularVel = [0; 0.0001; 0];
 
@@ -61,6 +63,8 @@ toPlotDir = zeros(3,DRAW_STEPS);
 toPlotDirN = zeros(3,DRAW_STEPS);
 toPlotPos = zeros(3,DRAW_STEPS);
 toPlotComp = zeros(3,DRAW_STEPS);
+toPlotVelo = zeros(3,DRAW_STEPS);
+
 x=1:1:CALC_STEPS;
 
 for i = x
@@ -92,21 +96,27 @@ for i = x
         toPlotDir(:, floor(i/SIM_FACTOR)) = dirSAT*5e5;
         toPlotDirN(:, floor(i/SIM_FACTOR)) = dirNormalSAT*5e5;
         toPlotPos(:, floor(i/SIM_FACTOR)) = posSAT;
+        toPlotVelo(:, floor(i/SIM_FACTOR)) = angularVel;
         B = mFluxDesity(posSAT, DIPOLE_EARTH);
-        toPlotComp(:,floor(i/SIM_FACTOR)) = [getComponent(B,dirSAT); getComponent(B,dirNormalSAT); getComponent(B, cross(dirSAT, dirNormalSAT))];
+        toPlotComp(:,floor(i/SIM_FACTOR)) = [getUsablity(B,dirSAT); getUsablity(B,dirNormalSAT); getUsablity(B, cross(dirSAT, dirNormalSAT))];
     end
     
     %------- ATTITUDE CONTROL -------
     %------- Phase 1: Detumbling -------
-    
-    mRequired = getDipoleMomentum(DIPOLE_EARTH, angularAcc, J);
-    m1 = getComponent(mRequired, dirSAT);
-    m2 = getComponent(mRequired, dirNormalSAT);
-    m3 = getComponent(mRequired, cross(dirSAT, dirNormalSAT));
-    
-    I_1 = solenoidNeededCurrent(m1)
-    I_2 = solenoidNeededCurrent(m2)
-    I_3 = solenoidNeededCurrent(m3)
+
+    norm(angularVel);
+    if(norm(angularVel) ~= 0 && norm(angularVel) < 0.1)
+        
+        mRequired = getDipoleMomentum(mFluxDesity(posSAT, DIPOLE_EARTH), angularVel, J);
+        m1 = getComponent(mRequired, dirSAT);
+        m2 = getComponent(mRequired, dirNormalSAT);
+        m3 = getComponent(mRequired, cross(dirSAT, dirNormalSAT));
+
+        I_1 = solenoidNeededCurrent(m1);
+        I_2 = solenoidNeededCurrent(m2);
+        I_3 = solenoidNeededCurrent(m3);
+    end
+
 end
 
 %draw B field
@@ -137,6 +147,12 @@ quiver3(toPlotPos(1,:),toPlotPos(2,:),toPlotPos(3,:),toPlotDir(1,:),toPlotDir(2,
 quiver3(toPlotPos(1,:),toPlotPos(2,:),toPlotPos(3,:),toPlotDirN(1,:),toPlotDirN(2,:),toPlotDirN(3,:),'AutoScale','on');
 axis equal;
 view(0,90);
+
+
+plot(toPlotVelo(1,:));
+plot(toPlotVelo(2,:));
+plot(toPlotVelo(3,:));
+
 
 %{
 plot(toPlotComp(1,:));
@@ -210,17 +226,24 @@ function t = magneticTorqueSAT(posSAT, dirSAT, dirNormalSAT, I_1, I_2, I_3)
     t = magneticTorque(BSAT, magnetorquer1) + magneticTorque(BSAT, magnetorquer2) + magneticTorque(BSAT, magnetorquer3);
 end
 
+function c = getUsablity(v, u)
+%   v: Vector which should be composed
+%   u: Vector which describes the axis
+
+    c =  1-(abs(getComponent(v, u)/norm(v)));
+end
+
 function c = getComponent(v, u)
 %   v: Vector which should be composed
 %   u: Vector which describes the axis
 
-    c =  1-(abs(dot(v,u) / norm(u)/norm(v)));
+    c =  dot(v,u) / norm(u);
 end
 
-function m = getDipoleMomentum(B, alpha, J)
+function m = getDipoleMomentum(B, anglV, J)
 %   B: magnetic flux density 
-%   alpha: angular acceleration
+%   anglV: angular acceleration
 %   J: moment of inertia
-    A = (-1) * J * alpha;
+    A = (-1) * J * (anglV * 2e1).^2 ;
     m = ( cross(B, A) / norm(cross(B, A)) ) * norm(A) / norm(B);
 end
