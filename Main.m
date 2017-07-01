@@ -10,8 +10,8 @@ DIPOLE_EARTH = [0; 0; 1e23];
 
 %--------- SIMULATION PARAMETERS------------
 global SIM_TIME DRAW_STEPS T CALC_STEPS SIM_FACTOR;
-SIM_TIME = 5545;%zoomed out (whole circle) ~5000 seconds 
-DRAW_STEPS = 1000;
+SIM_TIME = 5000;%zoomed out (whole circle) ~5000 seconds 
+DRAW_STEPS = 200;
 T = 0.5;
 
 CALC_STEPS = SIM_TIME / T;
@@ -38,10 +38,10 @@ I_2 = 0;%dir: dirNorm
 I_3 = 0;%dir: cross(dirSat,dirNorm)
 
 posSAT = [EARTH_RADIUS+HEIGHT; 0; 0]; 
-inclAngle = 0.5;
+inclAngle = 0.0;
 veloSAT = [0; cos(inclAngle)*V0; sin(inclAngle)*V0];
 
-angularVel = [0; 0; 0];
+angularVel = [0; 0; 0.01];
 
 %{
 B = mFluxDesity(posSAT, dipoleEarth);
@@ -61,6 +61,8 @@ toPlotDir = zeros(3,DRAW_STEPS);
 toPlotDirN = zeros(3,DRAW_STEPS);
 toPlotPos = zeros(3,DRAW_STEPS);
 toPlotComp = zeros(3,DRAW_STEPS);
+toPlotVelo = zeros(3,DRAW_STEPS);
+
 x=1:1:CALC_STEPS;
 
 for i = x
@@ -92,17 +94,30 @@ for i = x
         toPlotDir(:, floor(i/SIM_FACTOR)) = dirSAT*5e5;
         toPlotDirN(:, floor(i/SIM_FACTOR)) = dirNormalSAT*5e5;
         toPlotPos(:, floor(i/SIM_FACTOR)) = posSAT;
+        toPlotVelo(:, floor(i/SIM_FACTOR)) = angularVel;
         B = mFluxDesity(posSAT, DIPOLE_EARTH);
-        toPlotComp(:,floor(i/SIM_FACTOR)) = [getComponent(B,dirSAT); getComponent(B,dirNormalSAT); getComponent(B, cross(dirSAT, dirNormalSAT))];
+        toPlotComp(:,floor(i/SIM_FACTOR)) = [getUsablity(B,dirSAT); getUsablity(B,dirNormalSAT); getUsablity(B, cross(dirSAT, dirNormalSAT))];
     end
     
-       
+    %------- ATTITUDE CONTROL -------
+    %------- Phase 1: Detumbling -------
+    norm(angularVel);
+    if(norm(angularVel) ~= 0 && norm(angularVel) < 0.1)
+        
+        mRequired = getDipoleMomentum(mFluxDesity(posSAT, DIPOLE_EARTH), angularVel, J);
+        m1 = getComponent(mRequired, dirSAT);
+        m2 = getComponent(mRequired, dirNormalSAT);
+        m3 = getComponent(mRequired, cross(dirSAT, dirNormalSAT));
 
+        I_1 = solenoidNeededCurrent(m1);
+        I_2 = solenoidNeededCurrent(m2);
+        I_3 = solenoidNeededCurrent(m3);
+    end
 end
 
 %draw B field
 maxDist = EARTH_RADIUS-2*HEIGHT;
-Bresolution = 3;
+Bresolution = 2;
 values = -maxDist:maxDist/Bresolution:maxDist;
 Coords = zeros(3,length(values)*length(values)*length(values));
 bStrength = zeros(3,length(values)*length(values)*length(values));
@@ -130,11 +145,16 @@ axis equal;
 view(0,90);
 %}
 
+plot(toPlotVelo(1,:));
+plot(toPlotVelo(2,:));
+plot(toPlotVelo(3,:));
+
+%{
 plot(toPlotComp(1,:));
 plot(toPlotComp(2,:));
 plot(toPlotComp(3,:));
 %plot(toPlotComp(1,:) + toPlotComp(2,:)  + toPlotComp(3,:));
-
+%}
 function F_G = gravityEarth(r, m)
 %   r: from earth's center to location
 %   m: mass of object
@@ -182,6 +202,12 @@ function m = solenoidDipoleMomentum(I, A)
     m = COIL_TURNS * I * A * MU / MU_0;
 end
 
+function I = solenoidNeededCurrent(m)
+%   m: magnitude of dipole momentum
+    global MU_0 MU COIL_TURNS COIL_CROSSAREA
+    I = m * MU_0 / (MU * COIL_TURNS * COIL_CROSSAREA);
+end
+
 function t = magneticTorqueSAT(posSAT, dirSAT, dirNormalSAT, I_1, I_2, I_3)
 %   I: current flowing trough coil
 %   A: cross sectional area (normal vector)
@@ -195,9 +221,24 @@ function t = magneticTorqueSAT(posSAT, dirSAT, dirNormalSAT, I_1, I_2, I_3)
     t = magneticTorque(BSAT, magnetorquer1) + magneticTorque(BSAT, magnetorquer2) + magneticTorque(BSAT, magnetorquer3);
 end
 
+function c = getUsablity(v, u)
+%   v: Vector which should be composed
+%   u: Vector which describes the axis
+
+    c =  1-(abs(getComponent(v, u)/norm(v)));
+end
+
 function c = getComponent(v, u)
 %   v: Vector which should be composed
 %   u: Vector which describes the axis
 
-    c =  1-(abs(dot(v,u) / norm(u)/norm(v)));
+    c =  dot(v,u) / norm(u);
+end
+
+function m = getDipoleMomentum(B, anglV, J)
+%   B: magnetic flux density 
+%   anglV: angular acceleration
+%   J: moment of inertia
+    A = (-1) * J * (anglV * 2e1).^2 ;
+    m = ( cross(B, A) / norm(cross(B, A)) ) * norm(A) / norm(B);
 end
