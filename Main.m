@@ -1,12 +1,14 @@
 clear variables;
 
 %--------- GLOBAL CONSTANTS----------------
-global MU_0 GAMMA EARTH_RADIUS EARTH_MASS T;
+global MU_0 GAMMA EARTH_RADIUS EARTH_MASS T STEPS SIM_FACTOR;
 EARTH_RADIUS = 6371000;
 EARTH_MASS = 5.972e24;
 GAMMA = 6.674e-11;
 MU_0 = pi*4e-7;
-T = 0.001;
+T = 0.05;
+STEPS = 50;
+SIM_FACTOR = 700;
 
 % $x^2+e^{\pi i}$
 %-------- CUBESAT PARAMETERS--------------
@@ -17,27 +19,31 @@ CUBE_MASS = 1;
 
 
 
-V0 = sqrt(GAMMA * EARTH_MASS / EARTH_RADIUS)
+V0 = sqrt(GAMMA * EARTH_MASS / EARTH_RADIUS);
 
 dipoleEarth = [0; 0; 1e23];
-dipoleCube = [1; 0; 0]; %TODO test only
+dirSAT = [ 1/sqrt(3); 1/sqrt(3); 1/sqrt(3)];
+dipoleCube = dirSAT*1; %TODO test only
 
 posSAT = [EARTH_RADIUS+HEIGHT; 0; 0]; 
 veloSAT = [0; V0; 0];
 
 angularVel = [0; 0; 0];
-dirSAT = [1; 0; 0];
 
+
+%{
 B = mFluxDesity(posSAT, dipoleEarth);
 F_G = gravityEarth(posSAT, 1)
 F_m = magneticForce(posSAT, dipoleCube, dipoleEarth)
+%}
 
 % Plotting
 
 figure
 hold on
-toPlot = zeros(1,5000);
-x=1:1:5000;
+toPlotDir = zeros(3,STEPS);
+toPlotPos = zeros(3,STEPS);
+x=1:1:STEPS*SIM_FACTOR;
 
 for i = x
     
@@ -59,12 +65,21 @@ for i = x
     
     angularAcc =  J \ tSAT; % inv(J) * tSAT;
     angularVel = angularVel + angularAcc * T;
-    dirSAT = rotateVec(angularVel / norm(angularVel), dirSAT, norm(angularVel));
-    
-    toPlot(1,i) = dirSAT(1)*1e4;
+    if(norm(angularVel) ~= 0)
+        dirSAT = rotateVec(angularVel / norm(angularVel), dirSAT, norm(angularVel));
+    end
+    if (mod(i, SIM_FACTOR) == 0)
+        toPlotDir(:,i) = dirSAT*5e5;
+        toPlotPos(:,i) = posSAT;
+    end
 end
 
-plot(x, toPlot)
+quiver3(toPlotPos(1,:),toPlotPos(2,:),toPlotPos(3,:),toPlotDir(1,:),toPlotDir(2,:),toPlotDir(3,:),'AutoScale','off');
+axis equal;
+view(0,90);
+%feather(toPlotDirX,toPlotDirY);
+
+%plot(x, toPlot)
 
 function F_G = gravityEarth(r, m)
 %   r: from earth's center to location
