@@ -61,7 +61,7 @@ for i = x
     angularVel = angularVel + angularAcc * T;
     dirSAT = rotateVec(angularVel / norm(angularVel), dirSAT, norm(angularVel));
 
-    toPlot = [toPlot dirSAT(2)*1e4];
+    toPlot = [toPlot dirSAT(2,1)*1e4];
 end
 
 plot(x, toPlot)
