@@ -11,7 +11,7 @@ DIPOLE_EARTH = [0; 0; 1e23];
 %--------- SIMULATION PARAMETERS------------
 global SIM_TIME DRAW_STEPS T CALC_STEPS SIM_FACTOR;
 SIM_TIME = 5545;%zoomed out (whole circle) ~5000 seconds 
-DRAW_STEPS = 100;
+DRAW_STEPS = 1000;
 T = 0.5;
 
 CALC_STEPS = SIM_TIME / T;
@@ -35,10 +35,10 @@ V0 = sqrt(GAMMA * EARTH_MASS / (EARTH_RADIUS+HEIGHT));
 
 I_1 = 0;%dir: dirSat
 I_2 = 0;%dir: dirNorm
-I_3 = 0.01;%dir: cross(dirSat,dirNorm)
+I_3 = 0;%dir: cross(dirSat,dirNorm)
 
 posSAT = [EARTH_RADIUS+HEIGHT; 0; 0]; 
-inclAngle = 1;
+inclAngle = 0.5;
 veloSAT = [0; cos(inclAngle)*V0; sin(inclAngle)*V0];
 
 angularVel = [0; 0; 0];
@@ -53,7 +53,6 @@ dirSAT = [-1; 0; 0];
 dirNormalSAT = [0; 1; 0]; % Normal vector to diSAT, pointing to a specific face
 dipoleCube = dirSAT*1; %TODO test only
 
-
 % Plotting
 
 figure
@@ -61,6 +60,7 @@ hold on
 toPlotDir = zeros(3,DRAW_STEPS);
 toPlotDirN = zeros(3,DRAW_STEPS);
 toPlotPos = zeros(3,DRAW_STEPS);
+toPlotComp = zeros(3,DRAW_STEPS);
 x=1:1:CALC_STEPS;
 
 for i = x
@@ -92,6 +92,8 @@ for i = x
         toPlotDir(:, floor(i/SIM_FACTOR)) = dirSAT*5e5;
         toPlotDirN(:, floor(i/SIM_FACTOR)) = dirNormalSAT*5e5;
         toPlotPos(:, floor(i/SIM_FACTOR)) = posSAT;
+        B = mFluxDesity(posSAT, DIPOLE_EARTH);
+        toPlotComp(:,floor(i/SIM_FACTOR)) = [getComponent(B,dirSAT); getComponent(B,dirNormalSAT); getComponent(B, cross(dirSAT, dirNormalSAT))];
     end
     
        
@@ -119,16 +121,19 @@ for i = values
         end
     end
 end
-    
+%{
 quiver3(Coords(1,:),Coords(2,:),Coords(3,:),bStrength(1,:),bStrength(2,:),bStrength(3,:),'AutoScale','on');
 
 quiver3(toPlotPos(1,:),toPlotPos(2,:),toPlotPos(3,:),toPlotDir(1,:),toPlotDir(2,:),toPlotDir(3,:),'AutoScale','on');
 quiver3(toPlotPos(1,:),toPlotPos(2,:),toPlotPos(3,:),toPlotDirN(1,:),toPlotDirN(2,:),toPlotDirN(3,:),'AutoScale','on');
 axis equal;
 view(0,90);
-%feather(toPlotDirX,toPlotDirY);
+%}
 
-%plot(x, toPlot)
+plot(toPlotComp(1,:));
+plot(toPlotComp(2,:));
+plot(toPlotComp(3,:));
+%plot(toPlotComp(1,:) + toPlotComp(2,:)  + toPlotComp(3,:));
 
 function F_G = gravityEarth(r, m)
 %   r: from earth's center to location
@@ -188,4 +193,11 @@ function t = magneticTorqueSAT(posSAT, dirSAT, dirNormalSAT, I_1, I_2, I_3)
     BSAT = mFluxDesity(posSAT, DIPOLE_EARTH);
 
     t = magneticTorque(BSAT, magnetorquer1) + magneticTorque(BSAT, magnetorquer2) + magneticTorque(BSAT, magnetorquer3);
+end
+
+function c = getComponent(v, u)
+%   v: Vector which should be composed
+%   u: Vector which describes the axis
+
+    c =  1-(abs(dot(v,u) / norm(u)/norm(v)));
 end
