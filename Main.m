@@ -222,6 +222,5 @@ function m = getDipoleMomentum(B, alpha, J)
 %   alpha: angular acceleration
 %   J: moment of inertia
     A = (-1) * J * alpha;
-    m = [0; 0; 0];
     m = ( cross(B, A) / norm(cross(B, A)) ) * norm(A) / norm(B);
 end
