@@ -10,7 +10,7 @@ DIPOLE_EARTH = [0; 0; 1e23];
 
 %--------- SIMULATION PARAMETERS------------
 global SIM_TIME DRAW_STEPS T CALC_STEPS SIM_FACTOR;
-SIM_TIME = 5000;%zoomed out (whole circle) ~5000 seconds 
+SIM_TIME = 5545;%zoomed out (whole circle) ~5000 seconds 
 DRAW_STEPS = 200;
 T = 0.5;
 
@@ -42,6 +42,8 @@ inclAngle = 0.0;
 veloSAT = [0; cos(inclAngle)*V0; sin(inclAngle)*V0];
 
 angularVel = [0; 0; 0.01];
+
+angularVel = [0; 0.0001; 0];
 
 %{
 B = mFluxDesity(posSAT, dipoleEarth);
@@ -101,6 +103,7 @@ for i = x
     
     %------- ATTITUDE CONTROL -------
     %------- Phase 1: Detumbling -------
+
     norm(angularVel);
     if(norm(angularVel) ~= 0 && norm(angularVel) < 0.1)
         
@@ -113,6 +116,7 @@ for i = x
         I_2 = solenoidNeededCurrent(m2);
         I_3 = solenoidNeededCurrent(m3);
     end
+
 end
 
 %draw B field
@@ -136,18 +140,19 @@ for i = values
         end
     end
 end
-%{
+
 quiver3(Coords(1,:),Coords(2,:),Coords(3,:),bStrength(1,:),bStrength(2,:),bStrength(3,:),'AutoScale','on');
 
 quiver3(toPlotPos(1,:),toPlotPos(2,:),toPlotPos(3,:),toPlotDir(1,:),toPlotDir(2,:),toPlotDir(3,:),'AutoScale','on');
 quiver3(toPlotPos(1,:),toPlotPos(2,:),toPlotPos(3,:),toPlotDirN(1,:),toPlotDirN(2,:),toPlotDirN(3,:),'AutoScale','on');
 axis equal;
 view(0,90);
-%}
+
 
 plot(toPlotVelo(1,:));
 plot(toPlotVelo(2,:));
 plot(toPlotVelo(3,:));
+
 
 %{
 plot(toPlotComp(1,:));
