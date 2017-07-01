@@ -10,9 +10,9 @@ DIPOLE_EARTH = [0; 0; 1e23];
 
 %--------- SIMULATION PARAMETERS------------
 global SIM_TIME DRAW_STEPS T CALC_STEPS SIM_FACTOR;
-SIM_TIME = 5545;%zoomed out (whole circle) ~5000 seconds 
-DRAW_STEPS = 200;
-T = 0.5;
+SIM_TIME = 5545*3;%zoomed out (whole circle) ~5000 seconds 
+DRAW_STEPS = 300;
+T = 0.5*3;
 
 CALC_STEPS = SIM_TIME / T;
 SIM_FACTOR = 1.0 * CALC_STEPS / DRAW_STEPS;
@@ -38,12 +38,11 @@ I_2 = 0;%dir: dirNorm
 I_3 = 0;%dir: cross(dirSat,dirNorm)
 
 posSAT = [EARTH_RADIUS+HEIGHT; 0; 0]; 
-inclAngle = 0.0;
+inclAngle = 0.5;
 veloSAT = [0; cos(inclAngle)*V0; sin(inclAngle)*V0];
 
-angularVel = [0; 0; 0.01];
 
-angularVel = [0; 0.0001; 0];
+angularVel = [0.1; -0.1; 0.2];
 
 %{
 B = mFluxDesity(posSAT, dipoleEarth);
@@ -53,7 +52,7 @@ F_m = magneticForce(posSAT, dipoleCube, dipoleEarth)
 
 dirSAT = [-1; 0; 0];
 dirNormalSAT = [0; 1; 0]; % Normal vector to diSAT, pointing to a specific face
-dipoleCube = dirSAT*1; %TODO test only
+dipoleCube = dirSAT*0; %TODO test only
 
 % Plotting
 
@@ -104,17 +103,18 @@ for i = x
     %------- ATTITUDE CONTROL -------
     %------- Phase 1: Detumbling -------
 
-    norm(angularVel);
-    if(norm(angularVel) ~= 0 && norm(angularVel) < 0.1)
+    if(norm(angularVel) ~= 0 && norm(angularVel) < 1)
         
         mRequired = getDipoleMomentum(mFluxDesity(posSAT, DIPOLE_EARTH), angularVel, J);
-        m1 = getComponent(mRequired, dirSAT);
-        m2 = getComponent(mRequired, dirNormalSAT);
-        m3 = getComponent(mRequired, cross(dirSAT, dirNormalSAT));
+        if(norm(mRequired) ~= 0)
+            m1 = getComponent(mRequired, dirSAT);
+            m2 = getComponent(mRequired, dirNormalSAT);
+            m3 = getComponent(mRequired, cross(dirSAT, dirNormalSAT));
 
-        I_1 = solenoidNeededCurrent(m1);
-        I_2 = solenoidNeededCurrent(m2);
-        I_3 = solenoidNeededCurrent(m3);
+            I_1 = solenoidNeededCurrent(m1);
+            I_2 = solenoidNeededCurrent(m2);
+            I_3 = solenoidNeededCurrent(m3);
+        end
     end
 
 end
@@ -140,14 +140,14 @@ for i = values
         end
     end
 end
-
+%{
 quiver3(Coords(1,:),Coords(2,:),Coords(3,:),bStrength(1,:),bStrength(2,:),bStrength(3,:),'AutoScale','on');
 
 quiver3(toPlotPos(1,:),toPlotPos(2,:),toPlotPos(3,:),toPlotDir(1,:),toPlotDir(2,:),toPlotDir(3,:),'AutoScale','on');
 quiver3(toPlotPos(1,:),toPlotPos(2,:),toPlotPos(3,:),toPlotDirN(1,:),toPlotDirN(2,:),toPlotDirN(3,:),'AutoScale','on');
 axis equal;
 view(0,90);
-
+%}
 
 plot(toPlotVelo(1,:));
 plot(toPlotVelo(2,:));
@@ -244,6 +244,10 @@ function m = getDipoleMomentum(B, anglV, J)
 %   B: magnetic flux density 
 %   anglV: angular acceleration
 %   J: moment of inertia
-    A = (-1) * J * (anglV * 2e1).^2 ;
-    m = ( cross(B, A) / norm(cross(B, A)) ) * norm(A) / norm(B);
+    A = (-1) * J * anglV * 1e-3;
+    if(norm(cross(B, A)) ~= 0)
+        m = ( cross(B, A) / norm(cross(B, A)) ) * norm(A) / norm(B);
+    else
+        m = [0,0,0];
+    end
 end
