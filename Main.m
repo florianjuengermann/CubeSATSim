@@ -1,21 +1,24 @@
 clear variables;
 
 %--------- GLOBAL CONSTANTS----------------
-global MU_0 GAMMA EARTH_RADIUS EARTH_MASS T DIPOLE_EARTH SIM_FACTOR SIM_TIME DRAW_STEPS CALC_STEPS;
+global MU_0 GAMMA EARTH_RADIUS EARTH_MASS DIPOLE_EARTH;
 EARTH_RADIUS = 6371000;
 EARTH_MASS = 5.972e24;
 GAMMA = 6.674e-11;
 MU_0 = pi*4e-7;
+DIPOLE_EARTH = [0; 0; 1e23];
+
+%--------- SIMULATION PARAMETERS------------
+global SIM_TIME DRAW_STEPS T CALC_STEPS SIM_FACTOR;
 SIM_TIME = 5545;%zoomed out (whole circle) ~5000 seconds 
-DRAW_STEPS = 50;
+DRAW_STEPS = 100;
 T = 0.5;
 
 CALC_STEPS = SIM_TIME / T;
 SIM_FACTOR = 1.0 * CALC_STEPS / DRAW_STEPS;
 
-DIPOLE_EARTH = [0; 0; 1e23];
 
-% $x^2+e^{\pi i}$
+
 %-------- CUBESAT PARAMETERS--------------
 global HEIGHT J CUBE_MASS COIL_TURNS MU COIL_CROSSAREA;
 HEIGHT = 400000;
@@ -24,20 +27,21 @@ CUBE_MASS = 1;
 % Magnetorquers
 COIL_TURNS = 500;
 COIL_CROSSAREA = 0.000001;
-MU = 1;
+MU = 0.006;
 
 
 V0 = sqrt(GAMMA * EARTH_MASS / (EARTH_RADIUS+HEIGHT));
 
 
-I_1 = 0;
-I_2 = 0;
-I_3 = 0;
+I_1 = 0;%dir: dirSat
+I_2 = 0;%dir: dirNorm
+I_3 = 0.01;%dir: cross(dirSat,dirNorm)
 
 posSAT = [EARTH_RADIUS+HEIGHT; 0; 0]; 
-veloSAT = [0; V0; 0];
+inclAngle = 1;
+veloSAT = [0; cos(inclAngle)*V0; sin(inclAngle)*V0];
 
-angularVel = [0; 0; 0.00114];
+angularVel = [0; 0; 0];
 
 %{
 B = mFluxDesity(posSAT, dipoleEarth);
@@ -93,6 +97,30 @@ for i = x
        
 
 end
+
+%draw B field
+maxDist = EARTH_RADIUS-2*HEIGHT;
+Bresolution = 3;
+values = -maxDist:maxDist/Bresolution:maxDist;
+Coords = zeros(3,length(values)*length(values)*length(values));
+bStrength = zeros(3,length(values)*length(values)*length(values));
+c = 1;
+for i = values
+    for j = values
+        for k = values
+            BVec =  mFluxDesity([i;j;k],DIPOLE_EARTH);
+            BVec = BVec / norm(BVec);
+            Coo = [i,j,k];
+            for n = 1:3
+                Coords(n,c) = Coo(n);
+                bStrength(n,c) = BVec(n);
+            end
+            c = c + 1;
+        end
+    end
+end
+    
+quiver3(Coords(1,:),Coords(2,:),Coords(3,:),bStrength(1,:),bStrength(2,:),bStrength(3,:),'AutoScale','on');
 
 quiver3(toPlotPos(1,:),toPlotPos(2,:),toPlotPos(3,:),toPlotDir(1,:),toPlotDir(2,:),toPlotDir(3,:),'AutoScale','on');
 quiver3(toPlotPos(1,:),toPlotPos(2,:),toPlotPos(3,:),toPlotDirN(1,:),toPlotDirN(2,:),toPlotDirN(3,:),'AutoScale','on');
