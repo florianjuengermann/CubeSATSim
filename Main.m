@@ -1,21 +1,18 @@
 clear variables;
 
 %--------- GLOBAL CONSTANTS----------------
-global MU_0 GAMMA EARTH_RADIUS EARTH_MASS T DIPOLE_EARTH STEPS SIM_FACTOR;
+global MU_0 GAMMA EARTH_RADIUS EARTH_MASS T DIPOLE_EARTH SIM_FACTOR SIM_TIME DRAW_STEPS CALC_STEPS;
 EARTH_RADIUS = 6371000;
 EARTH_MASS = 5.972e24;
 GAMMA = 6.674e-11;
 MU_0 = pi*4e-7;
-%{
-%zoomed in 
-T = 0.05;
-STEPS = 20;
-SIM_FACTOR = 100;
-%}
-%zoomed out (whole circle) 
-T = 0.1;
-STEPS = 100;
-SIM_FACTOR = 500;
+SIM_TIME = 5545;%zoomed out (whole circle) ~5000 seconds 
+DRAW_STEPS = 50;
+T = 0.5;
+
+CALC_STEPS = SIM_TIME / T;
+SIM_FACTOR = 1.0 * CALC_STEPS / DRAW_STEPS;
+
 DIPOLE_EARTH = [0; 0; 1e23];
 
 % $x^2+e^{\pi i}$
@@ -30,17 +27,17 @@ COIL_CROSSAREA = 0.000001;
 MU = 1;
 
 
-V0 = sqrt(GAMMA * EARTH_MASS / EARTH_RADIUS);
+V0 = sqrt(GAMMA * EARTH_MASS / (EARTH_RADIUS+HEIGHT));
 
 
 I_1 = 0;
 I_2 = 0;
-I_3 = 1;
+I_3 = 0;
 
 posSAT = [EARTH_RADIUS+HEIGHT; 0; 0]; 
 veloSAT = [0; V0; 0];
 
-angularVel = [0; 0; 0];
+angularVel = [0; 0; 0.00114];
 
 %{
 B = mFluxDesity(posSAT, dipoleEarth);
@@ -48,7 +45,7 @@ F_G = gravityEarth(posSAT, 1)
 F_m = magneticForce(posSAT, dipoleCube, dipoleEarth)
 %}
 
-dirSAT = [1; 0; 0];
+dirSAT = [-1; 0; 0];
 dirNormalSAT = [0; 1; 0]; % Normal vector to diSAT, pointing to a specific face
 dipoleCube = dirSAT*1; %TODO test only
 
@@ -57,10 +54,10 @@ dipoleCube = dirSAT*1; %TODO test only
 
 figure
 hold on
-toPlotDir = zeros(3,STEPS);
-toPlotDirN = zeros(3,STEPS);
-toPlotPos = zeros(3,STEPS);
-x=1:1:STEPS*SIM_FACTOR;
+toPlotDir = zeros(3,DRAW_STEPS);
+toPlotDirN = zeros(3,DRAW_STEPS);
+toPlotPos = zeros(3,DRAW_STEPS);
+x=1:1:CALC_STEPS;
 
 for i = x
     
@@ -77,28 +74,28 @@ for i = x
     
     
     %------- CUBESAT ATTITUDE -------
-    B = mFluxDesity(posSAT, DIPOLE_EARTH);
     tSAT = magneticTorqueSAT(posSAT, dirSAT, dirNormalSAT, I_1, I_2, I_3);   % TODO Change I_x over time
     
     angularAcc =  J \ tSAT; % inv(J) * tSAT;
     angularVel = angularVel + angularAcc * T;
+    angularRotChange = angularVel * T;
     
     if(norm(angularVel) ~= 0)
-        dirSAT = rotateVec(angularVel / norm(angularVel), dirSAT, norm(angularVel));
-        dirNormalSAT = rotateVec(angularVel / norm(angularVel), dirNormalSAT, norm(angularVel));
+        dirSAT = rotateVec(angularRotChange / norm(angularRotChange), dirSAT, norm(angularRotChange));
+        dirNormalSAT = rotateVec(angularRotChange / norm(angularRotChange), dirNormalSAT, norm(angularRotChange));
     end
-    if (mod(i, SIM_FACTOR) == 0)
-        toPlotDir(:,i) = dirSAT*5e5;
-        toPlotDirN(:,i) = dirNormalSAT*5e5;
-        toPlotPos(:,i) = posSAT;
+    if ( floor(i / SIM_FACTOR) >  floor((i-1)/SIM_FACTOR))
+        toPlotDir(:, floor(i/SIM_FACTOR)) = dirSAT*5e5;
+        toPlotDirN(:, floor(i/SIM_FACTOR)) = dirNormalSAT*5e5;
+        toPlotPos(:, floor(i/SIM_FACTOR)) = posSAT;
     end
     
        
 
 end
 
-quiver3(toPlotPos(1,:),toPlotPos(2,:),toPlotPos(3,:),toPlotDir(1,:),toPlotDir(2,:),toPlotDir(3,:),'AutoScale','off');
-quiver3(toPlotPos(1,:),toPlotPos(2,:),toPlotPos(3,:),toPlotDirN(1,:),toPlotDirN(2,:),toPlotDirN(3,:),'AutoScale','off');
+quiver3(toPlotPos(1,:),toPlotPos(2,:),toPlotPos(3,:),toPlotDir(1,:),toPlotDir(2,:),toPlotDir(3,:),'AutoScale','on');
+quiver3(toPlotPos(1,:),toPlotPos(2,:),toPlotPos(3,:),toPlotDirN(1,:),toPlotDirN(2,:),toPlotDirN(3,:),'AutoScale','on');
 axis equal;
 view(0,90);
 %feather(toPlotDirX,toPlotDirY);
