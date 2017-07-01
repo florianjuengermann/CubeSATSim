@@ -11,7 +11,7 @@ DIPOLE_EARTH = [0; 0; 1e23];
 %--------- SIMULATION PARAMETERS------------
 global SIM_TIME DRAW_STEPS T CALC_STEPS SIM_FACTOR;
 SIM_TIME = 5545;%zoomed out (whole circle) ~5000 seconds 
-DRAW_STEPS = 1000;
+DRAW_STEPS = 200;
 T = 0.5;
 
 CALC_STEPS = SIM_TIME / T;
@@ -38,10 +38,10 @@ I_2 = 0;%dir: dirNorm
 I_3 = 0;%dir: cross(dirSat,dirNorm)
 
 posSAT = [EARTH_RADIUS+HEIGHT; 0; 0]; 
-inclAngle = 0.5;
+inclAngle = 0.3;
 veloSAT = [0; cos(inclAngle)*V0; sin(inclAngle)*V0];
 
-angularVel = [0; 0; 0];
+angularVel = [0; 0.0001; 0];
 
 %{
 B = mFluxDesity(posSAT, dipoleEarth);
@@ -96,13 +96,22 @@ for i = x
         toPlotComp(:,floor(i/SIM_FACTOR)) = [getComponent(B,dirSAT); getComponent(B,dirNormalSAT); getComponent(B, cross(dirSAT, dirNormalSAT))];
     end
     
-       
-
+    %------- ATTITUDE CONTROL -------
+    %------- Phase 1: Detumbling -------
+    
+    mRequired = getDipoleMomentum(DIPOLE_EARTH, angularAcc, J);
+    m1 = getComponent(mRequired, dirSAT);
+    m2 = getComponent(mRequired, dirNormalSAT);
+    m3 = getComponent(mRequired, cross(dirSAT, dirNormalSAT));
+    
+    I_1 = solenoidNeededCurrent(m1)
+    I_2 = solenoidNeededCurrent(m2)
+    I_3 = solenoidNeededCurrent(m3)
 end
 
 %draw B field
 maxDist = EARTH_RADIUS-2*HEIGHT;
-Bresolution = 3;
+Bresolution = 2;
 values = -maxDist:maxDist/Bresolution:maxDist;
 Coords = zeros(3,length(values)*length(values)*length(values));
 bStrength = zeros(3,length(values)*length(values)*length(values));
@@ -121,20 +130,20 @@ for i = values
         end
     end
 end
-%{
+
 quiver3(Coords(1,:),Coords(2,:),Coords(3,:),bStrength(1,:),bStrength(2,:),bStrength(3,:),'AutoScale','on');
 
 quiver3(toPlotPos(1,:),toPlotPos(2,:),toPlotPos(3,:),toPlotDir(1,:),toPlotDir(2,:),toPlotDir(3,:),'AutoScale','on');
 quiver3(toPlotPos(1,:),toPlotPos(2,:),toPlotPos(3,:),toPlotDirN(1,:),toPlotDirN(2,:),toPlotDirN(3,:),'AutoScale','on');
 axis equal;
 view(0,90);
-%}
 
+%{
 plot(toPlotComp(1,:));
 plot(toPlotComp(2,:));
 plot(toPlotComp(3,:));
 %plot(toPlotComp(1,:) + toPlotComp(2,:)  + toPlotComp(3,:));
-
+%}
 function F_G = gravityEarth(r, m)
 %   r: from earth's center to location
 %   m: mass of object
@@ -182,6 +191,12 @@ function m = solenoidDipoleMomentum(I, A)
     m = COIL_TURNS * I * A * MU / MU_0;
 end
 
+function I = solenoidNeededCurrent(m)
+%   m: magnitude of dipole momentum
+    global MU_0 MU COIL_TURNS COIL_CROSSAREA
+    I = m * MU_0 / (MU * COIL_TURNS * COIL_CROSSAREA);
+end
+
 function t = magneticTorqueSAT(posSAT, dirSAT, dirNormalSAT, I_1, I_2, I_3)
 %   I: current flowing trough coil
 %   A: cross sectional area (normal vector)
@@ -200,4 +215,13 @@ function c = getComponent(v, u)
 %   u: Vector which describes the axis
 
     c =  1-(abs(dot(v,u) / norm(u)/norm(v)));
+end
+
+function m = getDipoleMomentum(B, alpha, J)
+%   B: magnetic flux density 
+%   alpha: angular acceleration
+%   J: moment of inertia
+    A = (-1) * J * alpha;
+    m = [0; 0; 0];
+    m = ( cross(B, A) / norm(cross(B, A)) ) * norm(A) / norm(B);
 end
