@@ -38,11 +38,11 @@ I_2 = 0;%dir: dirNorm
 I_3 = 0;%dir: cross(dirSat,dirNorm)
 
 posSAT = [EARTH_RADIUS+HEIGHT; 0; 0]; 
-inclAngle = 0.50;
+inclAngle = 0.14;
 veloSAT = [0; cos(inclAngle)*V0; sin(inclAngle)*V0];
 
 
-angularVel = [0.01; -0.02; 0.001];
+angularVel = [0.01; -0.02; 0.01];
 
 %{
 B = mFluxDesity(posSAT, dipoleEarth);
@@ -160,7 +160,7 @@ plot(plotTime,toPlotVelo);
 xlabel('time [revoltutions]');
 ylabel('ang.Velo. [rad/s]');
 
-
+%{
 figure
 plot(plotTime,toPlotI);
 xlabel('time [revoltutions]');
@@ -171,7 +171,7 @@ figure
 plot(plotTime,toPlotMreq);
 xlabel('time [revoltutions]');
 ylabel('Mreq [I]');
-
+%}
 %{
 plot(toPlotComp(1,:));
 plot(toPlotComp(2,:));
@@ -262,7 +262,12 @@ function m = getDipoleMomentum(B, anglV, J)
 %   B: magnetic flux density 
 %   anglV: angular acceleration
 %   J: moment of inertia
-    A = (-1) * J * anglV* norm(anglV) * 1e-1;
+
+%   anglPerc: 1.0 -> B and anglV are perpendicular
+%             0.0 -> B and anglV are parallel
+    anglPerc = abs(acos(dot(B, anglV)/norm(B) / norm(anglV))-0.5*pi)/(0.5*pi);
+    %A = (-1) * J * anglV* norm(anglV) * 1.5*(1.01-anglPerc)^1.5; %advanced
+     A = (-1) * J * anglV* norm(anglV) * 0.15;
     if(norm(cross(B, A)) ~= 0)
         m = ( cross(B, A) / norm(cross(B, A)) ) * norm(A) / norm(B);
     else
