@@ -30,6 +30,11 @@ COIL_CROSSAREA = 0.000001;
 MU = 0.006;
 
 
+
+%-------- ATTITUDE CONTROL PARAMETERS--------------
+global PROPORTIONAL_COEFF;
+PROPORTIONAL_COEFF = 0.1;
+
 V0 = sqrt(GAMMA * EARTH_MASS / (EARTH_RADIUS+HEIGHT));
 
 
@@ -110,7 +115,7 @@ for i = x
 
     if(norm(angularVel) ~= 0 && norm(angularVel) < 1)
         
-        mRequired = getDipoleMomentum(mFluxDesity(posSAT, DIPOLE_EARTH), angularVel, J);
+        mRequired = getEstimatedDipoleMomentum(mFluxDesity(posSAT, DIPOLE_EARTH), angularVel, J);
         if(norm(mRequired) ~= 0)
             m1 = getComponent(mRequired, dirSAT);
             m2 = getComponent(mRequired, dirNormalSAT);
@@ -258,18 +263,18 @@ function c = getComponent(v, u)
     c =  dot(v,u) / norm(u);
 end
 
-function m = getDipoleMomentum(B, anglV, J)
+function m = getEstimatedDipoleMomentum(B, anglV, J)
 %   B: magnetic flux density 
-%   anglV: angular acceleration
+%   anglV: angular velocity
 %   J: moment of inertia
 
 %   anglPerc: 1.0 -> B and anglV are perpendicular
 %             0.0 -> B and anglV are parallel
+    global PROPORTIONAL_COEFF;
     anglPerc = abs(acos(dot(B, anglV)/norm(B) / norm(anglV))-0.5*pi)/(0.5*pi);
-    A = (-1) * J * anglV* norm(anglV) * 1.5*(1.01-anglPerc)^1.5; %advanced
-    %A = (-1) * J * anglV* norm(anglV) * 0.15; % old
+    A = (-1) * J * anglV * norm(anglV) * 1.5 * (1.01 - anglPerc)^1.5;
     if(norm(cross(B, A)) ~= 0)
-        m = ( cross(B, A) / norm(cross(B, A)) ) * norm(A) / norm(B);
+        m = ( cross(B, A) / norm(cross(B, A)) ) * norm(A) / norm(B)  * PROPORTIONAL_COEFF;
     else
         m = [0,0,0];
     end
