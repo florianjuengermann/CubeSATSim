@@ -33,7 +33,7 @@ MU = 0.006;
 
 %-------- ATTITUDE CONTROL PARAMETERS--------------
 global PROPORTIONAL_COEFF;
-PROPORTIONAL_COEFF = 0.1;
+PROPORTIONAL_COEFF = 1;
 
 V0 = sqrt(GAMMA * EARTH_MASS / (EARTH_RADIUS+HEIGHT));
 
@@ -164,6 +164,7 @@ figure
 plot(plotTime,toPlotVelo);
 xlabel('time [revoltutions]');
 ylabel('ang.Velo. [rad/s]');
+legend('x-axis','y-axis','z-axis');
 
 %{
 figure
