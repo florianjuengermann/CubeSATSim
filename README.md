@@ -39,7 +39,7 @@ Although the derivation from the perfect torque is quite large, the important th
 Testing has showed some pleasant results as long as the inclination was high but unsatisfying with lower inclination:   
 
 ![30 deg. inclination](https://raw.githubusercontent.com/ff17x3/CubeSATSim/master/images/Detumbling30degIncl_regular.PNG )    
-![8 deg. inclination](https://raw.githubusercontent.com/ff17x3/CubeSATSim/master/images/Detumbling8degIncl_regular.PNG )   
+![8 deg. inclination](https://raw.githubusercontent.com/ff17x3/CubeSATSim/master/images/Detumbling8degIncl_regular.png )   
 
 ### Second Approach
 With a secret trick we were able to improve the performance on low inclination orbits:  
