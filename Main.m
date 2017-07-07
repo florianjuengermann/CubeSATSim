@@ -266,8 +266,8 @@ function m = getDipoleMomentum(B, anglV, J)
 %   anglPerc: 1.0 -> B and anglV are perpendicular
 %             0.0 -> B and anglV are parallel
     anglPerc = abs(acos(dot(B, anglV)/norm(B) / norm(anglV))-0.5*pi)/(0.5*pi);
-    %A = (-1) * J * anglV* norm(anglV) * 1.5*(1.01-anglPerc)^1.5; %advanced
-     A = (-1) * J * anglV* norm(anglV) * 0.15;
+    A = (-1) * J * anglV* norm(anglV) * 1.5*(1.01-anglPerc)^1.5; %advanced
+    %A = (-1) * J * anglV* norm(anglV) * 0.15; % old
     if(norm(cross(B, A)) ~= 0)
         m = ( cross(B, A) / norm(cross(B, A)) ) * norm(A) / norm(B);
     else
