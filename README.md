@@ -1,6 +1,15 @@
 # CubeSATSim Project
 The goal of this project is to simulate and test the attitude control system of a 1U CubeSAT. In the end, the CubeSAT will be given fake sensor data from the 3D simulation and the reaction of the attitude control system will be read and fed into the simulation.
 
+## Table of Content
+[The Control Algorithm](https://github.com/ff17x3/CubeSATSim#setting)
+[The Control Algorithm](https://github.com/ff17x3/CubeSATSim#the-3d-simulation)
+[The Control Algorithm](https://github.com/ff17x3/CubeSATSim#the-earths-magnetic-field)
+[The Control Algorithm](https://github.com/ff17x3/CubeSATSim#the-sensors-and-the-interface)
+[The Control Algorithm](https://github.com/ff17x3/CubeSATSim#the-control-algorithm)
+[The Control Algorithm](https://github.com/ff17x3/CubeSATSim#https://github.com/ff17x3/CubeSATSim#part-i-detumbling)
+[The Control Algorithm](https://github.com/ff17x3/CubeSATSim#https://github.com/ff17x3/CubeSATSim#second-approach)
+
 # Setting
 The CubeSAT's orbit will have an altitude of 400km - 1000km. It will be equipped with a variety of sensors, including a three-axis gyroscope sensor, a three-axis magnetometer and a (maybe selfbuild) horizon sensor. The only way it will be able to control its attitude is by using the three magnetorquers it is equipped with.
 
@@ -17,6 +26,11 @@ The resulting 3D magnetic field looks like this:
 ![3D magnetic field](https://raw.githubusercontent.com/ff17x3/CubeSATSim/master/images/BField.png "3D magnetic field")  
 The magnetic flux density vector is calculated by using the the formula from [this reference]( https://en.wikipedia.org/wiki/Magnetic_dipole#External_magnetic_field_produced_by_a_magnetic_dipole_moment).
 Thus far it is not finally clear if this model is accurate enough and especially if the "horizontal scale" of the field matches the earth's one.
+
+# The Sensors and the Interface
+Currently we have not implemented any virtual sensors and just feed the [control algorithm](https://github.com/ff17x3/CubeSATSim#the-control-algorithm) the information (angular velocity, magnetic field strength etc.) straightly from the simulation. In the future we plan to add noise and offset values to the sensor data in order to recreate a simulation closer to the real world.
+
+Moreover the voltages which the control algorithm calculates are currently directly transformed to currents through the coils. Later we will implement a more accurate behavior, regarding effects like self-induction.
 
 # The Control Algorithm
 
