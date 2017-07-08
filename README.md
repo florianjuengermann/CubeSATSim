@@ -7,8 +7,8 @@ The goal of this project is to simulate and test the attitude control system of 
     - [The Earth's magnetic field](https://github.com/ff17x3/CubeSATSim#the-earths-magnetic-field)
 - [The Sensors and the Interface](https://github.com/ff17x3/CubeSATSim#the-sensors-and-the-interface)
 - [The Control Algorithm](https://github.com/ff17x3/CubeSATSim#the-control-algorithm)
-      - [Part I Detumbling](https://github.com/ff17x3/CubeSATSim#https://github.com/ff17x3/CubeSATSim#part-i-detumbling)
-           - [Second Approach](https://github.com/ff17x3/CubeSATSim#https://github.com/ff17x3/CubeSATSim#second-approach)
+    - [Part I Detumbling](https://github.com/ff17x3/CubeSATSim#https://github.com/ff17x3/CubeSATSim#part-i-detumbling)
+        - [Second Approach](https://github.com/ff17x3/CubeSATSim#https://github.com/ff17x3/CubeSATSim#second-approach)
 
 # The Setting
 The CubeSAT's orbit will have an altitude of 400km - 1000km. It will be equipped with a variety of sensors, including a three-axis gyroscope sensor, a three-axis magnetometer and a (maybe selfbuild) horizon sensor. The only way it will be able to control its attitude is by using the three magnetorquers it is equipped with.
