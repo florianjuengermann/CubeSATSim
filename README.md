@@ -30,7 +30,7 @@ Thus far it is not finally clear if this model is accurate enough and especially
 # The Sensors and the Interface
 Currently we have not implemented any virtual sensors and just feed the [control algorithm](https://github.com/ff17x3/CubeSATSim#the-control-algorithm) the information (angular velocity, magnetic field strength etc.) straightly from the simulation. In the future we plan to add noise and offset values to the sensor data in order to recreate a simulation closer to the real world.
 
-Moreover the voltages which the control algorithm calculates are currently directly transformed to currents through the coils. Later we will implement a more accurate behavior, regarding effects like self-induction.
+**Now** the voltages calculated by the control algorithm cause a slow but realistic increase in the current due to self-induction.
 
 # The Control Algorithm
 
