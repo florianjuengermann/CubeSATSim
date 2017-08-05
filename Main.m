@@ -20,27 +20,31 @@ SIM_FACTOR = 1.0 * CALC_STEPS / DRAW_STEPS;
 
 
 %-------- CUBESAT PARAMETERS--------------
-global HEIGHT J CUBE_MASS COIL_TURNS MU COIL_CROSSAREA;
+global HEIGHT J CUBE_MASS COIL_WHORLS MU COIL_LENGTH COIL_CROSSAREA COIL_RESISTANCE COIL_INDUCTANCE;
 HEIGHT = 400000;
 J = [ [1.0/600, 0, 0]; [ 0, 1.0/600, 0]; [0, 0, 1.0/600]]; 
 CUBE_MASS = 1;
 % Magnetorquers
-COIL_TURNS = 500;
-COIL_CROSSAREA = 0.000001;
+COIL_WHORLS = 500;
+COIL_LENGTH = 0.05; % 5cm
+COIL_CROSSAREA = 0.000001; % 1cm x 1cm
+COIL_RESISTANCE = 5;
+COIL_INDUCTANCE = COIL_CROSSAREA * COIL_WHORLS^2 * MU / COIL_LENGTH; % MU_R = MU / MU_0
 MU = 0.006;
 
 
 
 %-------- ATTITUDE CONTROL PARAMETERS--------------
-global PROPORTIONAL_COEFF;
+global ENERGY_SAVE_MODE PROPORTIONAL_COEFF;
 PROPORTIONAL_COEFF = 1;
+ENERGY_SAVE_MODE = true;
 
 V0 = sqrt(GAMMA * EARTH_MASS / (EARTH_RADIUS+HEIGHT));
 
 
-I_1 = 0;%dir: dirSat
-I_2 = 0;%dir: dirNorm
-I_3 = 0;%dir: cross(dirSat,dirNorm)
+I_1 = 0; U_1 = 0;%dir: dirSat
+I_2 = 0; U_2 = 0;%dir: dirNorm
+I_3 = 0; U_3 = 0;%dir: cross(dirSat,dirNorm)
 
 posSAT = [EARTH_RADIUS+HEIGHT; 0; 0]; 
 inclAngle = 0.14;
@@ -75,6 +79,12 @@ x=1:1:CALC_STEPS;
 
 for i = x
     
+    %------- COILS / MAGNETORQUERS -------
+    
+    I_1 = currentChange(I_1, U_1, T);
+    I_2 = currentChange(I_2, U_2, T);
+    I_3 = currentChange(I_3, U_3, T);
+    
     %------- CUBESAT POSITION -------
     F_G = gravityEarth(posSAT, 1);
     % TODO Calculate dipoleCube based on time-varying input
@@ -98,6 +108,8 @@ for i = x
         dirSAT = rotateVec(angularRotChange / norm(angularRotChange), dirSAT, norm(angularRotChange));
         dirNormalSAT = rotateVec(angularRotChange / norm(angularRotChange), dirNormalSAT, norm(angularRotChange));
     end
+    
+    %-----DRAWING-----------
     if ( floor(i / SIM_FACTOR) >  floor((i-1)/SIM_FACTOR))
         toPlotDir(:, floor(i/SIM_FACTOR)) = dirSAT*5e5;
         toPlotDirN(:, floor(i/SIM_FACTOR)) = dirNormalSAT*5e5;
@@ -112,8 +124,7 @@ for i = x
     
     %------- ATTITUDE CONTROL -------
     %------- Phase 1: Detumbling -------
-
-    if(norm(angularVel) ~= 0 && norm(angularVel) < 1)
+    if(norm(angularVel) ~= 0)
         
         mRequired = getEstimatedDipoleMomentum(mFluxDesity(posSAT, DIPOLE_EARTH), angularVel, J);
         if(norm(mRequired) ~= 0)
@@ -121,9 +132,18 @@ for i = x
             m2 = getComponent(mRequired, dirNormalSAT);
             m3 = getComponent(mRequired, cross(dirSAT, dirNormalSAT));
 
-            I_1 = solenoidNeededCurrent(m1);
-            I_2 = solenoidNeededCurrent(m2);
-            I_3 = solenoidNeededCurrent(m3);
+            targetI_1 = solenoidNeededCurrent(m1);
+            targetI_2 = solenoidNeededCurrent(m2);
+            targetI_3 = solenoidNeededCurrent(m3);
+            
+            if(ENERGY_SAVE_MODE)
+               % just set the current which will asymptotically lead to the right current
+               U_1 = getVoltageByTargetCurrent(targetI_1);
+               U_2 = getVoltageByTargetCurrent(targetI_2);
+               U_3 = getVoltageByTargetCurrent(targetI_3);
+            else
+               % TODO 
+            end
         end
     end
 
@@ -227,14 +247,15 @@ end
 function m = solenoidDipoleMomentum(I, A)
 %   I: current flowing trough coil
 %   A: cross sectional area (normal vector)
-    global MU_0 MU COIL_TURNS
-    m = COIL_TURNS * I * A * MU / MU_0;
+    global MU_0 MU COIL_WHORLS
+    % MU_R = MU / MU_0
+    m = COIL_WHORLS * I * A * MU / MU_0;
 end
 
 function I = solenoidNeededCurrent(m)
 %   m: magnitude of dipole momentum
-    global MU_0 MU COIL_TURNS COIL_CROSSAREA
-    I = m * MU_0 / (MU * COIL_TURNS * COIL_CROSSAREA);
+    global MU_0 MU COIL_WHORLS COIL_CROSSAREA
+    I = m * MU_0 / (MU * COIL_WHORLS * COIL_CROSSAREA);
 end
 
 function t = magneticTorqueSAT(posSAT, dirSAT, dirNormalSAT, I_1, I_2, I_3)
@@ -273,10 +294,25 @@ function m = getEstimatedDipoleMomentum(B, anglV, J)
 %             0.0 -> B and anglV are parallel
     global PROPORTIONAL_COEFF;
     anglPerc = abs(acos(dot(B, anglV)/norm(B) / norm(anglV))-0.5*pi)/(0.5*pi);
-    A = (-1) * J * anglV * norm(anglV) * 1.5 * (1.01 - anglPerc)^1.5;
+    A = (-1) * J * anglV * norm(anglV)^0.5 * 0.04 * (1.01 - anglPerc)^1.3;
     if(norm(cross(B, A)) ~= 0)
         m = ( cross(B, A) / norm(cross(B, A)) ) * norm(A) / norm(B)  * PROPORTIONAL_COEFF;
     else
         m = [0,0,0];
     end
+end
+
+function v = getVoltageByTargetCurrent(I)
+%   I: target current of the magnetorquers
+    global COIL_RESISTANCE;
+    v = COIL_RESISTANCE * I;
+end
+
+function I_new = currentChange(I, U, dt)
+%   I: current current of the coil
+%   U: current voltage at the coil
+%   dt: time past since last update
+
+    global COIL_RESISTANCE COIL_INDUCTANCE;
+    I_new  = U / COIL_RESISTANCE - (U / COIL_RESISTANCE - I) * exp( - dt * COIL_RESISTANCE / COIL_INDUCTANCE);
 end
