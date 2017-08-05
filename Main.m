@@ -294,7 +294,7 @@ function m = getEstimatedDipoleMomentum(B, anglV, J)
 %             0.0 -> B and anglV are parallel
     global PROPORTIONAL_COEFF;
     anglPerc = abs(acos(dot(B, anglV)/norm(B) / norm(anglV))-0.5*pi)/(0.5*pi);
-    A = (-1) * J * anglV * norm(anglV)^0.5 * 0.04 * (1.01 - anglPerc)^1.3;
+    A = (-1) * J * anglV * norm(anglV)^0.5 * 0.04 * (1.01 - anglPerc)^1.3; 
     if(norm(cross(B, A)) ~= 0)
         m = ( cross(B, A) / norm(cross(B, A)) ) * norm(A) / norm(B)  * PROPORTIONAL_COEFF;
     else
