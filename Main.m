@@ -1,5 +1,5 @@
 clear variables;
-% linux
+% linux 2
 %--------- GLOBAL CONSTANTS----------------
 global MU_0 GAMMA EARTH_RADIUS EARTH_MASS DIPOLE_EARTH;
 EARTH_RADIUS = 6371000;
