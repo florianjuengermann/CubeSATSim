@@ -24,21 +24,22 @@ global HEIGHT J CUBE_MASS COIL_WHORLS MU COIL_LENGTH COIL_CROSSAREA COIL_RESISTA
 HEIGHT = 400000;
 J = [ [1.0/600, 0, 0]; [ 0, 1.0/600, 0]; [0, 0, 1.0/600]]; 
 CUBE_MASS = 1;
+MU = 0.006; % depends on core material
 % Magnetorquers
 COIL_WHORLS = 500;
 COIL_LENGTH = 0.05; % 5cm
 COIL_CROSSAREA = 0.000001; % 1cm x 1cm
 COIL_RESISTANCE = 5;
 COIL_INDUCTANCE = COIL_CROSSAREA * COIL_WHORLS^2 * MU / COIL_LENGTH; % MU_R = MU / MU_0
-MU = 0.006;
+
 
 
 
 %-------- ATTITUDE CONTROL PARAMETERS--------------
-global ENERGY_SAVE_MODE PROPORTIONAL_COEFF;
+global ENERGY_SAVE_MODE PROPORTIONAL_COEFF DETUMBLING;
 PROPORTIONAL_COEFF = 1;
 ENERGY_SAVE_MODE = true;
-
+DETUMBLING = false;
 V0 = sqrt(GAMMA * EARTH_MASS / (EARTH_RADIUS+HEIGHT));
 
 
@@ -51,7 +52,7 @@ inclAngle = 0.14;
 veloSAT = [0; cos(inclAngle)*V0; sin(inclAngle)*V0];
 
 
-angularVel = [0.01; -0.02; 0.01];
+angularVel = [0.0001; -0.0002; 0.001];
 
 %{
 B = mFluxDesity(posSAT, dipoleEarth);
@@ -59,10 +60,11 @@ F_G = gravityEarth(posSAT, 1)
 F_m = magneticForce(posSAT, dipoleCube, dipoleEarth)
 %}
 
-dirSAT = [-1; 0; 0];
+dirSAT = [-1; 0; 0]; % Camera perspective
 dirNormalSAT = [0; 1; 0]; % Normal vector to diSAT, pointing to a specific face
 dipoleCube = dirSAT*0; %TODO test only
 
+toCenterVec = [0; 0; 0]; % Vector showing dirSAT's derivation from direction to earth's center 
 % Plotting
 
 
@@ -73,6 +75,7 @@ toPlotComp = zeros(3,DRAW_STEPS);
 toPlotVelo = zeros(3,DRAW_STEPS);
 toPlotI = zeros(3, DRAW_STEPS);
 toPlotMreq = zeros(3, DRAW_STEPS);
+toPlotToCenterVec = zeros(3,DRAW_STEPS);
 plotTime = zeros(1,DRAW_STEPS);
 
 x=1:1:CALC_STEPS;
@@ -109,11 +112,44 @@ for i = x
         dirNormalSAT = rotateVec(angularRotChange / norm(angularRotChange), dirNormalSAT, norm(angularRotChange));
     end
     
+    mRequired = [0,0,0];
+    
+    %------- ATTITUDE CONTROL -------
+    if (DETUMBLING)
+        %------- Phase 1: Detumbling -------
+        if(norm(angularVel) ~= 0)
+
+            mRequired = getEstimatedDipoleMomentum(mFluxDesity(posSAT, DIPOLE_EARTH), angularVel, J);
+            if(norm(mRequired) ~= 0)
+                m1 = getComponent(mRequired, dirSAT);
+                m2 = getComponent(mRequired, dirNormalSAT);
+                m3 = getComponent(mRequired, cross(dirSAT, dirNormalSAT));
+
+                targetI_1 = solenoidNeededCurrent(m1);
+                targetI_2 = solenoidNeededCurrent(m2);
+                targetI_3 = solenoidNeededCurrent(m3);
+
+                if(ENERGY_SAVE_MODE)
+                   % just set the current which will asymptotically lead to the right current
+                   U_1 = getVoltageByTargetCurrent(targetI_1);
+                   U_2 = getVoltageByTargetCurrent(targetI_2);
+                   U_3 = getVoltageByTargetCurrent(targetI_3);
+                else
+                   % TODO 
+                end
+            end
+        end
+    else
+        %------Phase 2: Active Control -------------
+        
+    end
+    
     %-----DRAWING-----------
     if ( floor(i / SIM_FACTOR) >  floor((i-1)/SIM_FACTOR))
         toPlotDir(:, floor(i/SIM_FACTOR)) = dirSAT*5e5;
         toPlotDirN(:, floor(i/SIM_FACTOR)) = dirNormalSAT*5e5;
         toPlotPos(:, floor(i/SIM_FACTOR)) = posSAT;
+        toPlotToCenterVec(:, floor(i/SIM_FACTOR)) = getToCenterVec(posSAT, dirSAT);
         toPlotVelo(:, floor(i/SIM_FACTOR)) = angularVel;
         toPlotI(:, floor(i/SIM_FACTOR)) = [I_1; I_2; I_3];
         toPlotMreq(:, floor(i/SIM_FACTOR)) = mRequired;
@@ -121,32 +157,6 @@ for i = x
         B = mFluxDesity(posSAT, DIPOLE_EARTH);
         toPlotComp(:,floor(i/SIM_FACTOR)) = [getUsablity(B,dirSAT); getUsablity(B,dirNormalSAT); getUsablity(B, cross(dirSAT, dirNormalSAT))];
     end
-    
-    %------- ATTITUDE CONTROL -------
-    %------- Phase 1: Detumbling -------
-    if(norm(angularVel) ~= 0)
-        
-        mRequired = getEstimatedDipoleMomentum(mFluxDesity(posSAT, DIPOLE_EARTH), angularVel, J);
-        if(norm(mRequired) ~= 0)
-            m1 = getComponent(mRequired, dirSAT);
-            m2 = getComponent(mRequired, dirNormalSAT);
-            m3 = getComponent(mRequired, cross(dirSAT, dirNormalSAT));
-
-            targetI_1 = solenoidNeededCurrent(m1);
-            targetI_2 = solenoidNeededCurrent(m2);
-            targetI_3 = solenoidNeededCurrent(m3);
-            
-            if(ENERGY_SAVE_MODE)
-               % just set the current which will asymptotically lead to the right current
-               U_1 = getVoltageByTargetCurrent(targetI_1);
-               U_2 = getVoltageByTargetCurrent(targetI_2);
-               U_3 = getVoltageByTargetCurrent(targetI_3);
-            else
-               % TODO 
-            end
-        end
-    end
-
 end
 
 %draw B field
@@ -179,11 +189,18 @@ quiver3(toPlotPos(1,:),toPlotPos(2,:),toPlotPos(3,:),toPlotDir(1,:),toPlotDir(2,
 quiver3(toPlotPos(1,:),toPlotPos(2,:),toPlotPos(3,:),toPlotDirN(1,:),toPlotDirN(2,:),toPlotDirN(3,:),'AutoScale','on');
 axis equal;
 view(0,90);
-%}
+
 figure 
 plot(plotTime,toPlotVelo);
 xlabel('time [revoltutions]');
 ylabel('ang.Velo. [rad/s]');
+legend('x-axis','y-axis','z-axis');
+%}
+
+figure 
+plot(plotTime,toPlotToCenterVec);
+xlabel('time [revoltutions]');
+ylabel('direction derivation');
 legend('x-axis','y-axis','z-axis');
 
 %{
@@ -204,6 +221,9 @@ plot(toPlotComp(2,:));
 plot(toPlotComp(3,:));
 %plot(toPlotComp(1,:) + toPlotComp(2,:)  + toPlotComp(3,:));
 %}
+
+
+
 function F_G = gravityEarth(r, m)
 %   r: from earth's center to location
 %   m: mass of object
@@ -315,4 +335,11 @@ function I_new = currentChange(I, U, dt)
 
     global COIL_RESISTANCE COIL_INDUCTANCE;
     I_new  = U / COIL_RESISTANCE - (U / COIL_RESISTANCE - I) * exp( - dt * COIL_RESISTANCE / COIL_INDUCTANCE);
+end
+
+function v = getToCenterVec(posSAT, dirSAT)
+%   posSAT: vector from earth's center to cubesat
+%   dirSAT: direction vector of the cubesat's camera
+
+    v = posSAT / (-norm(posSAT)) - dirSAT;
 end
