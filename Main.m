@@ -10,7 +10,7 @@ DIPOLE_EARTH = [0; 0; 1e23];
 
 %--------- SIMULATION PARAMETERS------------
 global SIM_TIME DRAW_STEPS T CALC_STEPS SIM_FACTOR;
-SIM_TIME = 5545*10;%zoomed out (whole circle) ~5000 seconds 
+SIM_TIME = 5545*5;%zoomed out (whole circle) ~5000 seconds 
 DRAW_STEPS = 600;
 T = 0.5*10;
 
@@ -42,17 +42,16 @@ ENERGY_SAVE_MODE = true;
 DETUMBLING = false;
 V0 = sqrt(GAMMA * EARTH_MASS / (EARTH_RADIUS+HEIGHT));
 
-
-I_1 = 0; U_1 = 0;%dir: dirSat
-I_2 = 0; U_2 = 0;%dir: dirNorm
-I_3 = 0; U_3 = 0;%dir: cross(dirSat,dirNorm)
+I = [0;0;0];%dir: dirSat; dirNorm;  cross(dirSat,dirNorm)
+U = [0;0;0];
 
 posSAT = [EARTH_RADIUS+HEIGHT; 0; 0]; 
-inclAngle = 0.14;
+inclAngle = 0.5;
 veloSAT = [0; cos(inclAngle)*V0; sin(inclAngle)*V0];
 
 
-angularVel = [0.0001; -0.0002; 0.001];
+angularVel = [0.0000; -0.0000; 0.00113];% global coordinate system
+angularVelRel = [0; 0; 0]; %relative to Cubsat -> gyroscope values
 
 %{
 B = mFluxDesity(posSAT, dipoleEarth);
@@ -75,7 +74,7 @@ toPlotComp = zeros(3,DRAW_STEPS);
 toPlotVelo = zeros(3,DRAW_STEPS);
 toPlotI = zeros(3, DRAW_STEPS);
 toPlotMreq = zeros(3, DRAW_STEPS);
-toPlotToCenterVec = zeros(3,DRAW_STEPS);
+toPlotToCenterVecRel = zeros(3,DRAW_STEPS);
 plotTime = zeros(1,DRAW_STEPS);
 
 x=1:1:CALC_STEPS;
@@ -83,10 +82,9 @@ x=1:1:CALC_STEPS;
 for i = x
     
     %------- COILS / MAGNETORQUERS -------
-    
-    I_1 = currentChange(I_1, U_1, T);
-    I_2 = currentChange(I_2, U_2, T);
-    I_3 = currentChange(I_3, U_3, T);
+    for j = 1 : length(I)
+       I(j) = currentChange(I(j), U(j), T);
+    end
     
     %------- CUBESAT POSITION -------
     F_G = gravityEarth(posSAT, 1);
@@ -101,47 +99,64 @@ for i = x
     
     
     %------- CUBESAT ATTITUDE -------
-    tSAT = magneticTorqueSAT(posSAT, dirSAT, dirNormalSAT, I_1, I_2, I_3);   % TODO Change I_x over time
+    tSAT = magneticTorqueSAT(posSAT, dirSAT, dirNormalSAT, I);
     
     angularAcc =  J \ tSAT; % inv(J) * tSAT;
     angularVel = angularVel + angularAcc * T;
     angularRotChange = angularVel * T;
     
-    if(norm(angularVel) ~= 0)
+    if(norm(angularRotChange) ~= 0)
         dirSAT = rotateVec(angularRotChange / norm(angularRotChange), dirSAT, norm(angularRotChange));
         dirNormalSAT = rotateVec(angularRotChange / norm(angularRotChange), dirNormalSAT, norm(angularRotChange));
     end
     
+    angularVelRel = getRelVec(angularVel, dirSAT, dirNormalSAT);
+
     mRequired = [0,0,0];
-    
+     
     %------- ATTITUDE CONTROL -------
+    Brel = getRelVec(mFluxDesity(posSAT, DIPOLE_EARTH), dirSAT, dirNormalSAT);
     if (DETUMBLING)
         %------- Phase 1: Detumbling -------
-        if(norm(angularVel) ~= 0)
-
-            mRequired = getEstimatedDipoleMomentum(mFluxDesity(posSAT, DIPOLE_EARTH), angularVel, J);
-            if(norm(mRequired) ~= 0)
-                m1 = getComponent(mRequired, dirSAT);
-                m2 = getComponent(mRequired, dirNormalSAT);
-                m3 = getComponent(mRequired, cross(dirSAT, dirNormalSAT));
-
-                targetI_1 = solenoidNeededCurrent(m1);
-                targetI_2 = solenoidNeededCurrent(m2);
-                targetI_3 = solenoidNeededCurrent(m3);
+        if(norm(angularVelRel) ~= 0)
+            mRequiredRel = getEstimatedDipoleMomentum(Brel, -angularVelRel, J);
+            if(norm(mRequiredRel) ~= 0)
+                targetI = solenoidNeededCurrent(mRequiredRel);
 
                 if(ENERGY_SAVE_MODE)
                    % just set the current which will asymptotically lead to the right current
-                   U_1 = getVoltageByTargetCurrent(targetI_1);
-                   U_2 = getVoltageByTargetCurrent(targetI_2);
-                   U_3 = getVoltageByTargetCurrent(targetI_3);
+                   U = getVoltageByTargetCurrent(targetI);
                 else
                    % TODO 
                 end
             end
         end
     else
-        %------Phase 2: Active Control -------------
         
+    %------Phase 2: Active Control -------------
+        targetBaseRot = [0;0;2 * pi / 5545]; % TODO 
+        toCenterVec = getToCenterVec(posSAT, dirSAT);
+        posCorRotAxis = getPosCorRotAxis(dirSAT, toCenterVec);
+        if(~isnan(posCorRotAxis(1)))
+            combinedTargetRot = getRelVec(targetBaseRot + posCorRotAxis * norm(toCenterVec)^1 * 2e-4, dirSAT, dirNormalSAT); %TODO
+
+            targetChange = +combinedTargetRot - angularVelRel;
+            % address magnetorques accordingly
+            %mRequiredRel = getEstimatedDipoleMomentum(Brel, targetChange, J);
+            mRequiredRel = [0;0;0];
+
+            if(norm(mRequiredRel) ~= 0 && ~isnan(mRequiredRel(1)))
+                targetI = solenoidNeededCurrent(mRequiredRel);
+
+                if(ENERGY_SAVE_MODE)
+                   % just set the current which will asymptotically lead to the right current
+                   U = getVoltageByTargetCurrent(targetI);
+                else
+                   % TODO 
+                end
+            end
+            
+        end
     end
     
     %-----DRAWING-----------
@@ -149,9 +164,9 @@ for i = x
         toPlotDir(:, floor(i/SIM_FACTOR)) = dirSAT*5e5;
         toPlotDirN(:, floor(i/SIM_FACTOR)) = dirNormalSAT*5e5;
         toPlotPos(:, floor(i/SIM_FACTOR)) = posSAT;
-        toPlotToCenterVec(:, floor(i/SIM_FACTOR)) = getToCenterVec(posSAT, dirSAT);
+        toPlotToCenterVecRel(:, floor(i/SIM_FACTOR)) = getRelVec(toCenterVec , dirSAT, dirNormalSAT);
         toPlotVelo(:, floor(i/SIM_FACTOR)) = angularVel;
-        toPlotI(:, floor(i/SIM_FACTOR)) = [I_1; I_2; I_3];
+        toPlotI(:, floor(i/SIM_FACTOR)) = I;
         toPlotMreq(:, floor(i/SIM_FACTOR)) = mRequired;
         plotTime( floor(i/SIM_FACTOR)) = i*T/5545.0;
         B = mFluxDesity(posSAT, DIPOLE_EARTH);
@@ -198,11 +213,11 @@ legend('x-axis','y-axis','z-axis');
 %}
 
 figure 
-plot(plotTime,toPlotToCenterVec);
+plot(plotTime,toPlotToCenterVecRel);
 xlabel('time [revoltutions]');
 ylabel('direction derivation');
-legend('x-axis','y-axis','z-axis');
-
+legend('dir-axis','norm-axis','cross-axis');
+%}
 %{
 figure
 plot(plotTime,toPlotI);
@@ -278,14 +293,14 @@ function I = solenoidNeededCurrent(m)
     I = m * MU_0 / (MU * COIL_WHORLS * COIL_CROSSAREA);
 end
 
-function t = magneticTorqueSAT(posSAT, dirSAT, dirNormalSAT, I_1, I_2, I_3)
+function t = magneticTorqueSAT(posSAT, dirSAT, dirNormalSAT, I)
 %   I: current flowing trough coil
 %   A: cross sectional area (normal vector)
-    global DIPOLE_EARTH COIL_CROSSAREA
-    magnetorquer1 = solenoidDipoleMomentum(I_1, ( dirSAT / norm(dirSAT) ) * COIL_CROSSAREA);
-    magnetorquer2 = solenoidDipoleMomentum(I_2, ( dirNormalSAT / norm(dirNormalSAT) ) * COIL_CROSSAREA);
-    magnetorquer3 = solenoidDipoleMomentum(I_3, ( cross(dirSAT, dirNormalSAT) / norm(cross(dirSAT, dirNormalSAT)) ) * COIL_CROSSAREA);
-    
+    global DIPOLE_EARTH COIL_CROSSAREA;
+    magnetorquer1 = solenoidDipoleMomentum(I(1), ( dirSAT / norm(dirSAT) ) * COIL_CROSSAREA);
+    magnetorquer2 = solenoidDipoleMomentum(I(2), ( dirNormalSAT / norm(dirNormalSAT) ) * COIL_CROSSAREA);
+    magnetorquer3 = solenoidDipoleMomentum(I(3), ( cross(dirSAT, dirNormalSAT) / norm(cross(dirSAT, dirNormalSAT)) ) * COIL_CROSSAREA);
+
     BSAT = mFluxDesity(posSAT, DIPOLE_EARTH);
 
     t = magneticTorque(BSAT, magnetorquer1) + magneticTorque(BSAT, magnetorquer2) + magneticTorque(BSAT, magnetorquer3);
@@ -304,17 +319,24 @@ function c = getComponent(v, u)
 
     c =  dot(v,u) / norm(u);
 end
-
-function m = getEstimatedDipoleMomentum(B, anglV, J)
+function v = getRelVec(in, a, b)
+%   in: vector which should be composed
+%   a, b: the vectors which describe the axis of the relative coordinate
+%   system
+    v = [getComponent(in, a);
+         getComponent(in, b);
+         getComponent(in, cross(a, b))];
+end
+function m = getEstimatedDipoleMomentum(B, targetTorque, J)
 %   B: magnetic flux density 
-%   anglV: angular velocity
+%   targetTorque: axis and amound of torque desired
 %   J: moment of inertia
 
-%   anglPerc: 1.0 -> B and anglV are perpendicular
-%             0.0 -> B and anglV are parallel
+%   anglPerc: 1.0 -> B and targetTorque are perpendicular
+%             0.0 -> B and targetTorque are parallel
     global PROPORTIONAL_COEFF;
-    anglPerc = abs(acos(dot(B, anglV)/norm(B) / norm(anglV))-0.5*pi)/(0.5*pi);
-    A = (-1) * J * anglV * norm(anglV)^0.5 * 0.04 * (1.01 - anglPerc)^1.3; 
+    anglPerc = abs(acos(dot(B, targetTorque)/norm(B) / norm(targetTorque))-0.5*pi)/(0.5*pi);
+    A = J * targetTorque * norm(targetTorque)^0.5 * 0.04 * (1.01 - anglPerc)^1.3; 
     if(norm(cross(B, A)) ~= 0)
         m = ( cross(B, A) / norm(cross(B, A)) ) * norm(A) / norm(B)  * PROPORTIONAL_COEFF;
     else
@@ -340,6 +362,12 @@ end
 function v = getToCenterVec(posSAT, dirSAT)
 %   posSAT: vector from earth's center to cubesat
 %   dirSAT: direction vector of the cubesat's camera
-
+    
     v = posSAT / (-norm(posSAT)) - dirSAT;
+end
+
+function v = getPosCorRotAxis(dirSAT, toCenterVec)
+    u = cross(dirSAT, toCenterVec);
+    v = u/ norm(u);
+
 end
