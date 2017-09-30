@@ -1,5 +1,5 @@
 clear variables;
-% linux 3
+% linux 4
 %--------- GLOBAL CONSTANTS----------------
 global MU_0 GAMMA EARTH_RADIUS EARTH_MASS DIPOLE_EARTH;
 EARTH_RADIUS = 6371000;
@@ -10,7 +10,7 @@ DIPOLE_EARTH = [0; 0; 1e23];
 
 %--------- SIMULATION PARAMETERS------------
 global SIM_TIME DRAW_STEPS T CALC_STEPS SIM_FACTOR;
-SIM_TIME = 5545*5;%zoomed out (whole circle) ~5000 seconds 
+SIM_TIME = 5545*8;%zoomed out (whole circle) ~5000 seconds 
 DRAW_STEPS = 600;
 T = 0.5*10;
 
@@ -36,7 +36,8 @@ COIL_INDUCTANCE = COIL_CROSSAREA * COIL_WHORLS^2 * MU / COIL_LENGTH; % MU_R = MU
 
 
 %-------- ATTITUDE CONTROL PARAMETERS--------------
-global ENERGY_SAVE_MODE PROPORTIONAL_COEFF DETUMBLING;
+global ENERGY_SAVE_MODE PROPORTIONAL_COEFF DETUMBLING CENTER_LAST_COUNT;
+CENTER_LAST_COUNT = 50;
 PROPORTIONAL_COEFF = 1;
 ENERGY_SAVE_MODE = true;
 DETUMBLING = false;
@@ -64,9 +65,10 @@ dirNormalSAT = [0; 1; 0]; % Normal vector to diSAT, pointing to a specific face
 dipoleCube = dirSAT*0; %TODO test only
 
 toCenterVec = [0; 0; 0]; % Vector showing dirSAT's derivation from direction to earth's center 
+toCenterLast = zeros(3, CENTER_LAST_COUNT);
+
+
 % Plotting
-
-
 toPlotDir = zeros(3,DRAW_STEPS);
 toPlotDirN = zeros(3,DRAW_STEPS);
 toPlotPos = zeros(3,DRAW_STEPS);
@@ -136,27 +138,31 @@ for i = x
     %------Phase 2: Active Control -------------
         targetBaseRot = [0;0;2 * pi / 5545]; % TODO 
         toCenterVec = getToCenterVec(posSAT, dirSAT);
-        posCorRotAxis = getPosCorRotAxis(dirSAT, toCenterVec);
-        if(~isnan(posCorRotAxis(1)))
-            combinedTargetRot = getRelVec(targetBaseRot + posCorRotAxis * norm(toCenterVec)^1 * 2e-4, dirSAT, dirNormalSAT); %TODO
+        
+        if( i > CENTER_LAST_COUNT)
+            change = toCenterVec - toCenterLast(:, mod(i - CENTER_LAST_COUNT, CENTER_LAST_COUNT)+1); 
+            posCorRotAxis = getPosCorRotAxis(dirSAT, toCenterVec);
+            if(~isnan(posCorRotAxis(1)))
+                combinedTargetRot = posCorRotAxis * norm(toCenterVec)^1 * 2e-3; %TODO
 
-            targetChange = +combinedTargetRot - angularVelRel;
-            % address magnetorques accordingly
-            %mRequiredRel = getEstimatedDipoleMomentum(Brel, targetChange, J);
-            mRequiredRel = [0;0;0];
+                targetChange = getRelVec(combinedTargetRot - getPosCorRotAxis(dirSAT, change)* norm(change)/CENTER_LAST_COUNT* 1e-3, dirSAT, dirNormalSAT);
+                % address magnetorques accordingly
+                mRequiredRel = getEstimatedDipoleMomentum(Brel, targetChange, J);
+                %mRequiredRel = [0;0;0];
 
-            if(norm(mRequiredRel) ~= 0 && ~isnan(mRequiredRel(1)))
-                targetI = solenoidNeededCurrent(mRequiredRel);
+                if(norm(mRequiredRel) ~= 0 && ~isnan(mRequiredRel(1)))
+                    targetI = solenoidNeededCurrent(mRequiredRel);
 
-                if(ENERGY_SAVE_MODE)
-                   % just set the current which will asymptotically lead to the right current
-                   U = getVoltageByTargetCurrent(targetI);
-                else
-                   % TODO 
+                    if(ENERGY_SAVE_MODE)
+                       % just set the current which will asymptotically lead to the right current
+                       U = getVoltageByTargetCurrent(targetI);
+                    else
+                       % TODO 
+                    end
                 end
             end
-            
         end
+        toCenterLast(:, mod(i, CENTER_LAST_COUNT)+1) = toCenterVec;
     end
     
     %-----DRAWING-----------
