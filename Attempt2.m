@@ -10,9 +10,9 @@ DIPOLE_EARTH = [0; 0; 1e23];
 
 %--------- SIMULATION PARAMETERS------------
 global SIM_TIME DRAW_STEPS T CALC_STEPS SIM_FACTOR;
-SIM_TIME = 5545*8;%zoomed out (whole circle) ~5000 seconds 
-DRAW_STEPS = 600;
-T = 0.5*10;
+SIM_TIME = 5545*0.2;%zoomed out (whole circle) ~5000 seconds 
+DRAW_STEPS = 200;
+T = 0.5*0.5;
 
 CALC_STEPS = SIM_TIME / T;
 SIM_FACTOR = 1.0 * CALC_STEPS / DRAW_STEPS;
@@ -36,9 +36,10 @@ COIL_INDUCTANCE = COIL_CROSSAREA * COIL_WHORLS^2 * MU / COIL_LENGTH; % MU_R = MU
 
 
 %-------- ATTITUDE CONTROL PARAMETERS--------------
-global ENERGY_SAVE_MODE PROPORTIONAL_COEFF DETUMBLING CENTER_LAST_COUNT;
+global ENERGY_SAVE_MODE PROPORTIONAL_COEFF DETUMBLING CENTER_LAST_COUNT PROPORTIONAL_COEFF_ACTIVE;
 CENTER_LAST_COUNT = 50;
 PROPORTIONAL_COEFF = 3e3;
+PROPORTIONAL_COEFF_ACTIVE = 5e3;
 ENERGY_SAVE_MODE = true;
 DETUMBLING = false;
 V0 = sqrt(GAMMA * EARTH_MASS / (EARTH_RADIUS+HEIGHT));
@@ -48,11 +49,11 @@ U = [0;0;0];
 energy = 0;
 
 posSAT = [EARTH_RADIUS+HEIGHT; 0; 0]; 
-inclAngle = 0.5;
+inclAngle = 0.0;
 veloSAT = [0; cos(inclAngle)*V0; sin(inclAngle)*V0];
 
 
-angularVel = [0.005; -0.002; 1];% global coordinate system
+angularVel = [0; 0; 0];% global coordinate system
 angularVelRel = [0; 0; 0]; %relative to Cubsat -> gyroscope values
 
 %{
@@ -62,7 +63,7 @@ F_m = magneticForce(posSAT, dipoleCube, dipoleEarth)
 %}
 
 dirSAT = [-1; 0; 0]; % Camera perspective
-dirNormalSAT = [0; 1; 0]; % Normal vector to diSAT, pointing to a specific face
+dirNormalSAT = [0; -1; 0]; % Normal vector to diSAT, pointing to a specific face
 dipoleCube = dirSAT*0; %TODO test only
 
 toCenterVec = [0; 0; 0]; % Vector showing dirSAT's derivation from direction to earth's center 
@@ -79,8 +80,11 @@ toPlotI = zeros(3, DRAW_STEPS);
 toPlotU = zeros(3, DRAW_STEPS);
 toPlotW = zeros(1, DRAW_STEPS);
 toPlotMreq = zeros(3, DRAW_STEPS);
-toPlotToCenterVecRel = zeros(3,DRAW_STEPS);
+toPlotAttDif = zeros(2,DRAW_STEPS);
+toPlotVeloC = zeros(3,DRAW_STEPS);
 plotTime = zeros(1,DRAW_STEPS);
+
+a = 0;
 
 x=1:1:CALC_STEPS;
 
@@ -116,23 +120,45 @@ for i = x
     
     angularVelRel = getRelVec(angularVel, dirSAT, dirNormalSAT);
     Brel = getRelVec(mFluxDesity(posSAT, DIPOLE_EARTH), dirSAT, dirNormalSAT);
-    mRequired = [0,0,0];
-    
-    if(false)
-        %------- ATTITUDE CONTROL ATTEMPT 1 -------
-        if (DETUMBLING)
+    mRequiredRel = [0,0,0];
+    rotAngle = 100;
+    targetCF = [0;0;0];
+
+    if (DETUMBLING)
+        if(false)
+            %------- ATTITUDE CONTROL ATTEMPT 1 -------
             %------- Phase 1: Detumbling -------
             if(norm(angularVelRel) ~= 0)
                 mRequiredRel = getEstimatedDipoleMomentum(Brel, -angularVelRel, J);
             end
+            
+        else 
+            %------- ATTITUDE CONTROL ATTEMPT 2   
+            rotB = Brel * dot(angularVelRel, Brel) / norm(Brel)^2; %rotVel projected onto B
+            rotNotB = rotB - angularVelRel; %other part of the rotVel, normal to rotB
+            if(norm(rotNotB) ~= 0)
+                t_target = rotNotB / norm(rotNotB);
+                mRequiredRel = cross(-t_target, Brel) * norm(rotNotB) * PROPORTIONAL_COEFF;
+            end
         end
-    else 
-        %------- ATTITUDE CONTROL ATTEMPT 2   
-        rotB = Brel * dot(angularVelRel, Brel) / norm(Brel)^2; %rotVel projected onto B
-        rotNotB = rotB - angularVelRel; %other part of the rotVel, normal to rotB
-        if(norm(rotNotB) ~= 0)
-            t_target = rotNotB / norm(rotNotB);
-            mRequiredRel = cross(-t_target, Brel) * norm(rotNotB) * PROPORTIONAL_COEFF;
+    else
+        %----------ACTIVE CONTROL---------------------
+        target = [1; 0; 0]; %in sunray direction (AF)
+        targetCF = AFToCF(target, getSunray(dirSAT, dirNormalSAT), Brel);
+        distAngle = acos(dot([1;0;0],targetCF) / norm(targetCF)); %x-dir
+        rotAxis = getRotAxis(targetCF, Brel);
+        if(norm(rotAxis)~=0)
+            rotAngle = getRotAngle(targetCF, rotAxis);
+            
+            if(i*T/5545.0 > 0.019)
+                'there';
+            end
+            targetVelo = rotAxis * abs(distAngle)^1 * 3e-2;
+            veloChange = targetVelo - angularVelRel;
+            mRequiredRel = cross(veloChange, Brel)/ norm(cross(veloChange, Brel)) * norm(veloChange)^2 *-3e1 * PROPORTIONAL_COEFF_ACTIVE;
+            if(norm(mRequiredRel) > 1)
+                mRequiredRel = mRequiredRel/norm(mRequiredRel);
+            end
         end
     end
 
@@ -153,12 +179,14 @@ for i = x
         toPlotDir(:, floor(i/SIM_FACTOR)) = dirSAT*5e5;
         toPlotDirN(:, floor(i/SIM_FACTOR)) = dirNormalSAT*5e5;
         toPlotPos(:, floor(i/SIM_FACTOR)) = posSAT;
-        toPlotToCenterVecRel(:, floor(i/SIM_FACTOR)) = getRelVec(toCenterVec, dirSAT, dirNormalSAT);
-        toPlotVelo(:, floor(i/SIM_FACTOR)) = [norm(angularVel); abs(angularVel(1)); abs(angularVel(2)); abs(angularVel(3))];
+        attDif = -targetCF + [1;0;0];
+        toPlotAttDif(:, floor(i/SIM_FACTOR)) = [rotAngle; distAngle];
+        toPlotVeloC(:, floor(i/SIM_FACTOR)) = veloChange;
+        toPlotVelo(:, floor(i/SIM_FACTOR)) = [(angularVel(1)); (angularVel(2)); (angularVel(3));0];
         toPlotI(:, floor(i/SIM_FACTOR)) = I;
         toPlotU(:, floor(i/SIM_FACTOR)) = U;
         toPlotW(:, floor(i/SIM_FACTOR)) = energy;
-        toPlotMreq(:, floor(i/SIM_FACTOR)) = mRequired;
+        toPlotMreq(:, floor(i/SIM_FACTOR)) = mRequiredRel;
         plotTime( floor(i/SIM_FACTOR)) = i*T/5545.0;
         B = mFluxDesity(posSAT, DIPOLE_EARTH);
         toPlotComp(:,floor(i/SIM_FACTOR)) = [getUsablity(B,dirSAT); getUsablity(B,dirNormalSAT); getUsablity(B, cross(dirSAT, dirNormalSAT))];
@@ -186,30 +214,48 @@ for i = values
         end
     end
 end
+
+
 %{
 figure
 hold on
-quiver3(Coords(1,:),Coords(2,:),Coords(3,:),bStrength(1,:),bStrength(2,:),bStrevvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvngth(3,:),'AutoScale','on');
+quiver3(Coords(1,:),Coords(2,:),Coords(3,:),bStrength(1,:),bStrength(2,:),bStrength(3,:),'AutoScale','on');
 
 quiver3(toPlotPos(1,:),toPlotPos(2,:),toPlotPos(3,:),toPlotDir(1,:),toPlotDir(2,:),toPlotDir(3,:),'AutoScale','on');
 quiver3(toPlotPos(1,:),toPlotPos(2,:),toPlotPos(3,:),toPlotDirN(1,:),toPlotDirN(2,:),toPlotDirN(3,:),'AutoScale','on');
 axis equal;
 view(0,90);
 %}
+
 %{
+% Detumbling Comparison
+load('data/veloAttempt1_28deg_1rad_s.mat');
 figure 
-plot(plotTime,toPlotVelo(:,:));
+plot(plotTime, vertcat(SavedVelo1(1,:), toPlotVelo(1,:)));
 set(gca, 'YScale', 'log');
 xlabel('time [revoltutions]');
 ylabel('ang.Velo. [rad/s]');
-%legend('combined','x-axis','y-axis','z-axis');
+legend('Attempt 1','Attempt 2');
 %}
-%{
+
 figure 
-plot(plotTime,toPlotToCenterVecRel);
+plot(plotTime,toPlotAttDif);
 xlabel('time [revoltutions]');
-ylabel('direction derivation');
-legend('dir-axis','norm-axis','cross-axis');
+ylabel('attitude derivation [rad]');
+legend('rot axis','direct');
+
+figure
+plot(plotTime,toPlotVeloC);
+xlabel('time [revoltutions]');
+ylabel('veloChange');
+
+figure
+plot(plotTime,toPlotVelo);
+xlabel('time [revoltutions]');
+ylabel('velo');
+
+
+
 %}
 %{
 figure
@@ -221,6 +267,7 @@ figure
 plot(plotTime,toPlotU);
 xlabel('time [revoltutions]');
 ylabel('Voltage [V]');
+%}
 %{
 figure
 
@@ -252,6 +299,10 @@ function B = mFluxDesity(r, m )
     global MU_0;
     B = MU_0* 1 / ( 4 * pi) * ( (3*r*dot(r,m)) / (norm(r)^5)  - m / (norm(r)^3) );
 
+end
+
+function s = getSunray(cubedir, cubenorm)
+    s = getRelVec([0; -1;0],cubedir, cubenorm);
 end
 
 function F_m = magneticForce(r, m, mE)
@@ -334,9 +385,9 @@ function m = getEstimatedDipoleMomentum(B, targetTorque, J)
 %             0.0 -> B and targetTorque are parallel
     global PROPORTIONAL_COEFF;
     anglPerc = abs(acos(dot(B, targetTorque)/norm(B) / norm(targetTorque))-0.5*pi)/(0.5*pi);
-    A = J * targetTorque * norm(targetTorque)^0.5 * 0.04 * (1.01 - anglPerc)^1.3; 
+    A = J * targetTorque * norm(targetTorque)^0.5 * 0.04 * (1.01 - anglPerc)^1.1; 
     if(norm(cross(B, A)) ~= 0)
-        m = ( cross(B, A) / norm(cross(B, A)) ) * norm(A) / norm(B)  * PROPORTIONAL_COEFF;
+        m = ( cross(B, A) / norm(cross(B, A)) ) * norm(A) / norm(B)  * 3e-4 * PROPORTIONAL_COEFF;
     else
         m = [0,0,0];
     end
@@ -357,15 +408,53 @@ function I_new = currentChange(I, U, dt)
     I_new  = U / COIL_RESISTANCE - (U / COIL_RESISTANCE - I) * exp( - dt * COIL_RESISTANCE / COIL_INDUCTANCE);
 end
 
-function v = getToCenterVec(posSAT, dirSAT)
-%   posSAT: vector from earth's center to cubesat
-%   dirSAT: direction vector of the cubesat's camera
+% Attitude Frame vector to Cubesat Frame vector
+function u = AFToCF(v, s, B)
+%   v:      vector in Attitude Frame
+%   s:    sunray vector
+%   B:      magnetic field vector
+%   return: v in Cubsat Frame
     
-    v = posSAT / (-norm(posSAT)) - dirSAT;
-end
-
-function v = getPosCorRotAxis(dirSAT, toCenterVec)
-    u = cross(dirSAT, toCenterVec);
-    v = u/ norm(u);
+    % b (to s) the perpendicular part of B
+    b = B - dot(B, s) / norm(s) * s / norm(s);
+    u = v(1)*s + v(2)*b + v(3)*cross(s,b);
+    %u = dot(v, s)/norm(s) * [1;0;0] + dot(v, b)/norm(b) * [0;1;0] + dot(v, cross(v, b))/norm(cross(v, b)) * [0;0;1];
 
 end
+
+function rot = getRotAxis(u, B)
+%   u:      target attitude
+%   B:      magnetic field vector
+%   return: best rot. axis to move [1;0;0] to u
+    
+    % v: current attitude
+    v = [1; 0; 0];
+    % w: normal vector of plane of all possible rotation vectors
+    w = cross(v + u, cross(v, u));
+
+    if (norm(w) == 0)
+        %u and v are colinear (could be opposite)
+        r = [0;0;0];
+    elseif (B(3)*w(2) - B(2)*w(3) == 0 || B(3) == 0)
+        r = [0;0;0];
+    else
+        r = [1;
+            (B(1)*w(3) - B(3)*w(1))/(B(3)*w(2) - B(2)*w(3));
+            -B(1)/B(3) - B(2) * (B(1)*w(3) - B(3)*w(1))/(B(3) * (B(3)*w(2) - B(2)*w(3)) )];
+        r = r / norm(r);
+    end 
+    rot = r;
+end
+
+function alpha = getRotAngle(u,r)
+%   u:      target attitude 
+%   r:      rotation axis
+%   return: angle needed to map [1;0;0] to u by a rotation around r
+
+    % v: current attitude
+    v = [1; 0; 0];
+
+    f = r * dot(r, u)/norm(r)^2;
+    alpha = acos(dot(u-f, v-f) / (norm(u-f)*norm(v-f)) );
+end
+
